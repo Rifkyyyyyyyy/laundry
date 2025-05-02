@@ -5,6 +5,9 @@ node_modules/
 .env
 .env.*
 
+# Jangan commit file service credential
+*.service.json
+
 # Opsional: ignore folder dist/build hasil build
 dist/
 build/
