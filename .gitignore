@@ -1,1 +1,17 @@
+# Jangan commit node_modules
+node_modules/
+
+# Jangan commit file konfigurasi environment
 .env
+.env.*
+
+# Opsional: ignore folder dist/build hasil build
+dist/
+build/
+
+# Opsional: editor/IDE files
+.vscode/
+.idea/
+
+# Jangan commit file log
+*.log
