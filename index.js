@@ -20,7 +20,8 @@ const memberRoutes = require('./routes/member/member_routes');
 const outletRoutes = require('./routes/outlet/outlet_routes');
 const profitRoutes = require('./routes/profit/profit_routes');
 const categoryRoutes = require('./routes/category/category_routes');
-const authRoutes = require('./routes/auth/auth_routes')
+const authRoutes = require('./routes/auth/auth_routes');
+const userRoutes = require('./routes/user/user_routes')
 
 // Register all routes with /api/ prefix
 app.use('/api', paymentRoutes);
@@ -31,13 +32,14 @@ app.use('/api', memberRoutes);
 app.use('/api', outletRoutes);
 app.use('/api', profitRoutes);
 app.use('/api', categoryRoutes);
-app.use('/api', authRoutes)
+app.use('/api', authRoutes);
+app.use('/api', userRoutes)
 
 //
 const server = http.createServer(app);
 
 
-mongoose.connect('mongodb://localhost:27017/dbLaundry', {
+mongoose.connect(process.env.CLOUD_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 15000,

@@ -18,3 +18,4 @@ build/
 
 # Jangan commit file log
 *.log
+service.json
