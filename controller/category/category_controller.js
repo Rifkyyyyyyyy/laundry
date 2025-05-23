@@ -5,19 +5,30 @@ const {
     getCategoryById,
     deleteCategory,
     updateCategory,
+    getAllNamePhotoCategories
 } = require('../../service/category/category_service');
 const catchAsync = require('../../utils/catchAsync');
 const { StatusCodes } = require('http-status-codes');
+const { formatImageToBase64 } = require('../../utils/func');
 
 // CREATE CATEGORY
 const createCategoryController = catchAsync(async (req, res) => {
-    const { name, description, status } = req.body; // Destructuring req.body
+    const { name, description, status } = req.body;
+    const image = req.files?.image;
+
+
+    let formattedImage = null;
+    if (image) {
+        formattedImage = formatImageToBase64(image);
+    }
 
     const newCategory = await createCategory({
         name,
         description,
-        status
+        status,
+        image: formattedImage
     });
+
 
     res.status(StatusCodes.CREATED).json({
         status: true,
@@ -86,11 +97,22 @@ const updateCategoryController = catchAsync(async (req, res) => {
     });
 });
 
+const getAllNamePhotoCategoriesController = catchAsync(async (req, res) => {
+    const categories = await getAllNamePhotoCategories();
+    res.status(StatusCodes.OK).json({
+        status: true,
+        message: 'All categories retrieved successfully',
+        data: categories
+    });
+});
+
+
 module.exports = {
     createCategoryController,
     getActiveCategoriesController,
     getAllCategoriesController,
     getCategoryByIdController,
     deleteCategoryController,
-    updateCategoryController
+    updateCategoryController ,
+    getAllNamePhotoCategoriesController
 };

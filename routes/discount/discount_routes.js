@@ -2,34 +2,30 @@ const express = require("express");
 const router = express.Router();
 
 const {
-    validateDiscountController,
-    getDiscountByCodeController,
-    createDiscountController,
-    getAllDiscountsController,
-    updateDiscountController,
-    deleteDiscountController,
-    getActiveDiscountsController,
+  createDiscountByOutletController,
+  deleteDiscountController,
+  updateDiscountController,
+  getAllDiscountController,
+  getDiscountsByOutletController,
 } = require('../../controller/discount/discount_controller');
 
 // [POST] /discount - Tambah diskon baru
-router.post("/discount", createDiscountController);
+router.post("/discount", createDiscountByOutletController);
 
 // [GET] /discount - Ambil semua diskon
-router.get("/discount", getAllDiscountsController);
+router.get("/discount", getAllDiscountController);
 
-// [GET] /discount/active - Ambil semua diskon yang aktif
-router.get("/discount/active", getActiveDiscountsController);
 
-// [GET] /discount/code/:code - Ambil diskon berdasarkan kode
-router.get("/discount/code/:code", getDiscountByCodeController);
 
-// [POST] /discount/validate - Validasi kode diskon (input lewat body)
-router.post("/discount/validate", validateDiscountController);
+// [GET] /discount/by-outlet/:outletId - Ambil diskon berdasarkan outlet
+router.get("/discount/by-outlet/:outletId", getDiscountsByOutletController);
 
-// [PATCH] /discount/:id - Update diskon berdasarkan ID
-router.patch("/discount/:id", updateDiscountController);
 
-// [DELETE] /discount/:id - Hapus diskon berdasarkan ID
-router.delete("/discount/:id", deleteDiscountController);
+
+// [PUT] /discount/:discountId - Update diskon
+router.put("/discount/:discountId", updateDiscountController);
+
+// [DELETE] /discount/:discountId - Hapus diskon
+router.delete("/discount/:discountId", deleteDiscountController);
 
 module.exports = router;

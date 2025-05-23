@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
-const User = require('../user/user');
+const { Schema } = mongoose;
 
 const paymentSchema = new Schema({
   orderId: {
@@ -8,44 +7,53 @@ const paymentSchema = new Schema({
     ref: 'Order',
     required: true
   },
-  amount: { type: Number, required: true },
-  paymentMethod: {
+
+  invoiceNumber: {
     type: String,
-    enum: ['credit_card', 'bank_transfer', 'qris', 'cash'],
-    required: true
+    required: true,
+    unique: true,
+    trim: true
   },
+
   paymentType: {
     type: String,
-    enum: ['online', 'offline'],
+    enum: ['cash', 'bank_transfer', 'ewallet'],
     required: true
   },
-  status: {
+
+  paymentStatus: {
     type: String,
-    enum: ['pending', 'completed', 'failed'],
+    enum: ['pending', 'paid', 'failed', 'expired', 'cancelled'],
     default: 'pending'
   },
+
+  amountPaid: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+
+  paidAt: {
+    type: Date,
+    default: null
+  },
+
   transactionId: {
     type: String,
-    required: function () {
-      return this.paymentType === 'online';
-    }
+    default: null // Midtrans only
   },
-  updatedBy: {
+
+  metadata: {
+    type: Schema.Types.Mixed, // Bisa simpan data Midtrans, keterangan tambahan, dsb
+    default: {}
+  },
+
+  processedBy: {
     type: Schema.Types.ObjectId,
-    ref: 'User',
-    validate: {
-      validator: async function (userId) {
-        if (!userId || this.paymentType !== 'offline') return true;
-        const user = await User.findById(userId);
-        return user && user.role === 'kasir';
-      },
-      message: 'updatedBy hanya boleh diisi oleh user dengan role kasir'
-    },
-    required: function () {
-      return this.paymentType === 'offline';
-    }
-  },
-  paymentDate: { type: Date, default: Date.now }
-}, { timestamps: true });
+    ref: 'User', // Admin/kasir yang input pembayaran
+    default: null
+  }
+
+}, { timestamps: true, versionKey: false });
 
 module.exports = mongoose.model('Payment', paymentSchema);

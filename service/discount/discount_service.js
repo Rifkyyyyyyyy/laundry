@@ -1,110 +1,178 @@
 const ApiError = require('../../utils/apiError');
 const { STATUS_CODES } = require('http');
-const Discount = require('../../model/discount/discount');
+const Discount = require('../../model/discounts/discount');
+const { getPagination } = require('../../utils/func');
 
-const createDiscount = async (data) => {
-  if (new Date(data.validFrom) >= new Date(data.validUntil)) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Tanggal mulai harus lebih awal dari tanggal berakhir');
-  }
-
-  const existing = await Discount.findOne({ code: data.code });
-  if (existing) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Kode diskon sudah digunakan');
-  }
-
-  const discount = new Discount(data);
-  return await discount.save();
-};
-
-const getAllDiscounts = async () => {
-  return await Discount.find();
-};
-
-const getActiveDiscounts = async () => {
+const createDiscountForOutletService = async (
+  code,
+  discountAmount,
+  validFrom,
+  validUntil,
+  applicableProductIds,
+  outletId,
+  maxUsage
+) => {
   const now = new Date();
-  return await Discount.find({
-    status: 'active',
-    validFrom: { $lte: now },
-    validUntil: { $gte: now }
-  });
-};
 
-const getDiscountByCode = async (code) => {
-  const discount = await Discount.findOne({ code });
-  if (!discount) {
-    throw new ApiError(STATUS_CODES.NOT_FOUND, 'Diskon tidak ditemukan');
-  }
-  return discount;
-};
-
-const updateDiscount = async (id, data) => {
-  if (data.validFrom && data.validUntil && new Date(data.validFrom) >= new Date(data.validUntil)) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Tanggal mulai harus lebih awal dari tanggal berakhir');
+  // Validasi: discountAmount harus antara 1 dan 100 (persen)
+  if (
+    typeof discountAmount !== 'number' ||
+    discountAmount < 1 ||
+    discountAmount > 100
+  ) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Nilai diskon harus berupa persentase antara 1 hingga 100.'
+    );
   }
 
-  if (data.code) {
-    const existing = await Discount.findOne({ code: data.code, _id: { $ne: id } });
-    if (existing) {
-      throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Kode diskon sudah digunakan');
-    }
+  const start = new Date(validFrom);
+  const end = new Date(validUntil);
+
+  // Validasi: Tanggal mulai dan akhir tidak boleh sama
+  if (start.getTime() === end.getTime()) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Tanggal mulai dan tanggal akhir tidak boleh sama.'
+    );
   }
 
-  const updated = await Discount.findByIdAndUpdate(id, data, {
-    new: true,
-    runValidators: true
-  });
-
-  if (!updated) {
-    throw new ApiError(STATUS_CODES.NOT_FOUND, 'Diskon tidak ditemukan untuk diperbarui');
+  // Validasi: Tanggal mulai dan akhir tidak boleh di masa lalu
+  if (start < now || end < now) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Tanggal mulai dan tanggal akhir tidak boleh lebih awal dari hari ini.'
+    );
   }
 
-  return updated;
-};
-
-const deleteDiscount = async (id) => {
-  const deleted = await Discount.findByIdAndDelete(id);
-  if (!deleted) {
-    throw new ApiError(STATUS_CODES.NOT_FOUND, 'Diskon tidak ditemukan');
+  // Cek apakah kode diskon sudah ada
+  const existingDiscount = await Discount.findOne({ code });
+  if (existingDiscount) {
+    throw new ApiError(
+      StatusCodes.CONFLICT,
+      'Kode diskon sudah digunakan. Silakan gunakan kode lain.'
+    );
   }
-  return deleted;
-};
 
-const validateDiscount = async (code, productId = null) => {
-  const now = new Date();
-  const discount = await Discount.findOne({
+  const data = {
     code,
+    discountAmount,
+    validFrom: start,
+    validUntil: end,
+    applicableProductIds,
+    outlet: outletId,
+    maxUsage,
+    usageCount: 0,
     status: 'active',
-    validFrom: { $lte: now },
-    validUntil: { $gte: now }
-  });
+  };
 
-  if (!discount) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Diskon tidak valid atau sudah kedaluwarsa');
+  try {
+    const discount = new Discount(data);
+    await discount.save();
+    return discount;
+  } catch (error) {
+    throw new ApiError(
+      StatusCodes.INTERNAL_SERVER_ERROR,
+      'Terjadi kesalahan saat menyimpan diskon: ' + error.message
+    );
   }
+};
 
-  if (discount.maxUsage && discount.usageCount >= discount.maxUsage) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Diskon sudah mencapai batas penggunaan');
-  }
 
-  if (productId && discount.applicableProductIds?.length > 0) {
-    const isAllowed = discount.applicableProductIds.map(p => p.toString()).includes(productId.toString());
-    if (!isAllowed) {
-      throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Diskon tidak berlaku untuk produk ini');
+
+// DELETE DISCOUNT
+const deleteDiscountForOutletService = async (discountId, outletId) => {
+  try {
+    const discount = await Discount.findOneAndDelete({ _id: discountId, outlet: outletId });
+    if (!discount) {
+      throw new ApiError(STATUS_CODES.NOT_FOUND, 'Discount not found for this outlet');
     }
+    return discount;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error.message);
   }
+};
 
-  discount.usageCount += 1;
-  await discount.save();
+// UPDATE DISCOUNT
+const updateDiscountForOutletService = async (discountId, outletId, updateData) => {
+  try {
+    const discount = await Discount.findOneAndUpdate(
+      { _id: discountId, outlet: outletId },
+      updateData,
+      { new: true }
+    );
 
-  return discount;
+    if (!discount) {
+      throw new ApiError(STATUS_CODES.NOT_FOUND, 'Discount not found for this outlet');
+    }
+
+    return discount;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error.message);
+  }
+};
+
+// GET ALL DISCOUNTS FOR AN OUTLET (with pagination)
+const getDiscountsForOutletService = async (outletId, page = 1, limit = 5) => {
+  try {
+    const { skip, limit: pageLimit } = getPagination({ page, limit });
+
+    const discounts = await Discount.find({ outlet: outletId })
+      .skip(skip)
+      .limit(pageLimit)
+      .populate('applicableProductIds', 'name pricePerKg') // Populate nama & harga produk
+      .sort({ createdAt: -1 });
+
+    const total = await Discount.countDocuments({ outlet: outletId });
+
+    return {
+      discounts,
+      pagination: {
+        total,
+        page,
+        limit: pageLimit,
+        pages: Math.ceil(total / pageLimit),
+      },
+    };
+  } catch (error) {
+    throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error.message);
+  }
+};
+
+// GET ALL DISCOUNTS (global) (with pagination)
+const getAllDiscountService = async (page = 1, limit = 5) => {
+  try {
+    const { skip, limit: pageLimit } = getPagination({ page, limit });
+
+    const discounts = await Discount.find()
+      .skip(skip)
+      .limit(pageLimit)
+      .populate('outlet', 'name address') // Populate nama dan alamat outlet
+      .populate('applicableProductIds', 'name pricePerKg') // Populate nama dan harga produk
+      .sort({ createdAt: -1 });
+
+    const total = await Discount.countDocuments();
+
+    return {
+      discounts,
+      pagination: {
+        total,
+        page,
+        limit: pageLimit,
+        pages: Math.ceil(total / pageLimit),
+      },
+    };
+  } catch (error) {
+    throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error.message);
+  }
 };
 
 module.exports = {
-  createDiscount,
-  getAllDiscounts,
-  getActiveDiscounts,
-  getDiscountByCode,
-  updateDiscount,
-  deleteDiscount,
-  validateDiscount
+  createDiscountForOutletService,
+  deleteDiscountForOutletService,
+  updateDiscountForOutletService,
+  getDiscountsForOutletService,
+  getAllDiscountService,
 };

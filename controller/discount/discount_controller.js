@@ -1,90 +1,99 @@
-
-// controllers/discount_controller.js
 const catchAsync = require('../../utils/catchAsync');
 const { StatusCodes } = require('http-status-codes');
 const {
-  createDiscount,
-  getAllDiscounts,
-  getActiveDiscounts,
-  getDiscountByCode,
-  updateDiscount,
-  deleteDiscount,
-  validateDiscount
+  createDiscountForOutletService,
+  deleteDiscountForOutletService,
+  updateDiscountForOutletService,
+  getAllDiscountService,
+  getDiscountsForOutletService
 } = require('../../service/discount/discount_service');
 
-const createDiscountController = catchAsync(async (req, res) => {
-  const newDiscount = await createDiscount(req.body);
+// 1. Create Discount
+const createDiscountByOutletController = catchAsync(async (req, res) => {
+  const {
+    outletId,
+    code,
+    discountAmount,
+    validFrom,
+    validUntil,
+    applicableProductIds,
+    maxUsage
+  } = req.body;
+
+  const newDiscount = await createDiscountForOutletService(
+    code,
+    discountAmount,
+    validFrom,
+    validUntil,
+    applicableProductIds,
+    outletId,
+    maxUsage
+  );
+
   res.status(StatusCodes.CREATED).json({
     status: true,
-    message: 'Discount successfully created',
+    message: 'Diskon berhasil dibuat',
     data: newDiscount
   });
 });
 
-const getAllDiscountsController = catchAsync(async (req, res) => {
-  const discounts = await getAllDiscounts();
+// 2. Get All Discounts (admin)
+const getAllDiscountController = catchAsync(async (req, res) => {
+  const { page = 1, limit = 5 } = req.query;
+  const discounts = await getAllDiscountService(Number(page), Number(limit));
+
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'All discounts retrieved successfully',
+    message: 'Semua diskon berhasil diambil',
     data: discounts
   });
 });
 
-const getActiveDiscountsController = catchAsync(async (req, res) => {
-  const discounts = await getActiveDiscounts();
+// 3. Get Discounts by Outlet
+const getDiscountsByOutletController = catchAsync(async (req, res) => {
+  const { outletId } = req.params;
+  const { page = 1, limit = 5 } = req.query;
+
+  const discounts = await getDiscountsForOutletService(outletId, Number(page), Number(limit));
+
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Active discounts retrieved successfully',
+    message: `Diskon untuk outlet ${outletId} berhasil diambil`,
     data: discounts
   });
 });
 
-const getDiscountByCodeController = catchAsync(async (req, res) => {
-  const { code } = req.params;
-  const discount = await getDiscountByCode(code);
-  res.status(StatusCodes.OK).json({
-    status: true,
-    message: 'Discount found',
-    data: discount
-  });
-});
-
+// 4. Update Discount
 const updateDiscountController = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const updatedDiscount = await updateDiscount(id, req.body);
+  const { discountId } = req.params;
+  const { outletId, ...updateData } = req.body;
+
+  const updatedDiscount = await updateDiscountForOutletService(discountId, outletId, updateData);
+
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Discount successfully updated',
+    message: `Diskon ${discountId} berhasil diperbarui`,
     data: updatedDiscount
   });
 });
 
+// 5. Delete Discount
 const deleteDiscountController = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  await deleteDiscount(id);
-  res.status(StatusCodes.NO_CONTENT).json({
-    status: true,
-    message: 'Discount successfully deleted',
-    data: null
-  });
-});
+  const { discountId } = req.params;
+  const { outletId } = req.body;
 
-const validateDiscountController = catchAsync(async (req, res) => {
-  const { code, productId } = req.params;
-  const discount = await validateDiscount(code, productId);
+  await deleteDiscountForOutletService(discountId, outletId);
+
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Discount validated successfully',
-    data: discount
+    message: `Diskon ${discountId} berhasil dihapus`
   });
 });
 
 module.exports = {
-  createDiscountController,
-  getAllDiscountsController,
-  getActiveDiscountsController,
-  getDiscountByCodeController,
+  createDiscountByOutletController,
+  getAllDiscountController,
+  getDiscountsByOutletController,
   updateDiscountController,
-  deleteDiscountController,
-  validateDiscountController
+  deleteDiscountController
 };

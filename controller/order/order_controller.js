@@ -1,140 +1,142 @@
 const catchAsync = require('../../utils/catchAsync');
 const { StatusCodes } = require('http-status-codes');
 const {
-  getOrderById,
-  getOrdersByDateRange,
-  getOrdersByUser,
-  cancelOrder,
-  createOrder,
-  getAllOrders,
-  updateOrderStatus,
-  applyDiscountToOrder,
-  calculateTotal
+  createOrderByCashierService,
+  createOrderByUserService,
+  getAllOrdersByOutletService,
+  getAllOrdersService,
+  getOrderByIdService,
+  cancelOrderServices,
 } = require('../../service/order/order_service');
 
 // CREATE ORDER
-const createOrderController = catchAsync(async (req, res) => {
-  const { customerId, outletId, items, note, pickupDate } = req.body;
+const createOrderByUserController = catchAsync(async (req, res) => {
+  const {
+    customerId,
+    outletId,
+    items,
+    pickupDate,
+    note,
+    paymentType,
+    discountCode,
+    serviceType = 'regular',
+  } = req.body;
 
-  // Create a new order
-  const newOrder = await createOrder({ customerId, outletId, items, note, pickupDate });
+  const order = await createOrderByUserService({
+    customerId,
+    outletId,
+    items,
+    pickupDate,
+    note,
+    paymentType,
+    discountCode,
+    serviceType
+  });
 
   res.status(StatusCodes.CREATED).json({
     status: true,
-    message: 'Order successfully created',
-    data: newOrder
+    message: 'Order berhasil dibuat',
+    data: order,
   });
 });
+
+
+const createOrderByCashierController = catchAsync(async (req, res) => {
+  const {
+    processedBy,
+    customerName,
+    customerPhone,
+    customerEmail,
+    outletId,
+    items,
+    pickupDate,
+    note,
+    paymentType = 'cash',
+    serviceType = 'regular',
+    memberCode,
+  } = req.body;
+
+  const order = await createOrderByCashierService({
+    processedBy ,
+    customerName ,
+    customerPhone ,
+    customerEmail ,
+    outletId ,
+    items ,
+    pickupDate ,
+    note ,
+    paymentType ,
+    serviceType ,
+    memberCode
+  })
+
+  res.status(StatusCodes.CREATED).json({
+    status: true,
+    message: 'Order berhasil dibuat',
+    data: order,
+  });
+});
+
+
 
 // GET ORDER BY ID
 const getOrderByIdController = catchAsync(async (req, res) => {
   const { id } = req.params;
-  const order = await getOrderById(id);
-  if (!order) {
-    return res.status(StatusCodes.NOT_FOUND).json({
-      status: false,
-      message: 'Order not found',
-      data: null
-    });
-  }
+
+  const order = await getOrderByIdService(id);
 
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Order retrieved successfully',
-    data: order
+    message: 'Detail order berhasil diambil',
+    data: order,
   });
 });
 
-// GET ORDERS BY USER
-const getOrdersByUserController = catchAsync(async (req, res) => {
-  const { userId } = req.params;
-  const orders = await getOrdersByUser(userId);
+// GET ALL ORDERS BY OUTLET
+const getAllOrdersByOutletController = catchAsync(async (req, res) => {
+  const { outletId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+
+  const data = await getAllOrdersByOutletService(Number(page), Number(limit), outletId);
+
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Orders retrieved successfully',
-    data: orders
+    message: `Daftar order untuk outlet ${outletId} berhasil diambil`,
+    data,
   });
 });
 
 // GET ALL ORDERS
 const getAllOrdersController = catchAsync(async (req, res) => {
-  const orders = await getAllOrders();
-  res.status(StatusCodes.OK).json({
-    status: true,
-    message: 'All orders retrieved successfully',
-    data: orders
-  });
-});
+  const { page = 1, limit = 10 } = req.query;
 
-// GET ORDERS BY DATE RANGE
-const getOrdersByDateRangeController = catchAsync(async (req, res) => {
-  const { start, end } = req.query;
-  const orders = await getOrdersByDateRange(start, end);
+  const data = await getAllOrdersService(Number(page), Number(limit));
+
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Orders by date range retrieved successfully',
-    data: orders
+    message: 'Daftar order dari semua outlet berhasil diambil',
+    data,
   });
 });
 
 // CANCEL ORDER
 const cancelOrderController = catchAsync(async (req, res) => {
   const { id } = req.params;
-  await cancelOrder(id);
-  res.status(StatusCodes.NO_CONTENT).json({
-    status: true,
-    message: 'Order successfully canceled',
-    data: null
-  });
-});
 
-// UPDATE ORDER STATUS
-const updateOrderStatusController = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-
-  const updatedOrder = await updateOrderStatus(id, status);
-  if (!updatedOrder) {
-    return res.status(StatusCodes.NOT_FOUND).json({
-      status: false,
-      message: 'Order not found',
-      data: null
-    });
-  }
+  const cancelled = await cancelOrderServices(id);
 
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Order status updated successfully',
-    data: updatedOrder
-  });
-});
-
-// APPLY DISCOUNT TO ORDER
-const applyDiscountToOrderController = catchAsync(async (req, res) => {
-  const { orderId, discountCode } = req.body;
-  const updatedOrder = await applyDiscountToOrder(orderId, discountCode);
-  if (!updatedOrder) {
-    return res.status(StatusCodes.NOT_FOUND).json({
-      status: false,
-      message: 'Order not found or discount invalid',
-      data: null
-    });
-  }
-
-  res.status(StatusCodes.OK).json({
-    status: true,
-    message: 'Discount successfully applied',
-    data: updatedOrder
+    message: 'Order berhasil dibatalkan',
+    data: cancelled,
   });
 });
 
 module.exports = {
-  createOrderController,
+  createOrderByUserController ,
+  createOrderByCashierController ,
   getOrderByIdController,
-  getOrdersByUserController,
+  getAllOrdersByOutletController,
   getAllOrdersController,
-  getOrdersByDateRangeController,
   cancelOrderController,
-  updateOrderStatusController,
-  applyDiscountToOrderController
 };

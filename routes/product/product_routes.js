@@ -8,20 +8,21 @@ const {
   deleteProductController,
   getAllProductsController,
   searchProductsController,
-  updateProductController ,
+  updateProductController,
+  getProductsByOutletIdController
 } = require('../../controller/product/product_controller');
 
 // [POST] /product - Tambah produk baru
 router.post("/product", createProductController);
 
-// [GET] /product - Ambil semua produk
+// [GET] /product - Ambil semua produk dengan pagination
 router.get("/product", getAllProductsController);
 
 // [GET] /product/search - Cari produk berdasarkan keyword
 router.get("/product/search", searchProductsController);
 
-// [GET] /product/category/:category - Ambil produk berdasarkan kategori
-router.get("/product/category/:category", getProductsByCategoryController);
+// [GET] /product/category/:categoryId - Ambil produk berdasarkan kategori
+router.get("/product/category/:categoryId", getProductsByCategoryController);
 
 // [GET] /product/:id - Ambil produk berdasarkan ID
 router.get("/product/:id", getProductByIdController);
@@ -31,5 +32,8 @@ router.patch("/product/:id", updateProductController);
 
 // [DELETE] /product/:id - Hapus produk berdasarkan ID
 router.delete("/product/:id", deleteProductController);
+
+// [GET] /product/outlet/:outletId - Ambil produk berdasarkan Outlet ID dengan pagination
+router.get("/product/outlet/:outletId", getProductsByOutletIdController);
 
 module.exports = router;

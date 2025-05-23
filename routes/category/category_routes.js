@@ -7,7 +7,8 @@ const {
   deleteCategoryController,
   getAllCategoriesController,
   updateCategoryController,
-  getActiveCategoriesController
+  getActiveCategoriesController ,
+  getAllNamePhotoCategoriesController
 } = require('../../controller/category/category_controller');
 
 // [POST] /category - Tambah kategori baru
@@ -15,6 +16,8 @@ router.post("/category", createCategoryController);
 
 // [GET] /category - Ambil semua kategori
 router.get("/category", getAllCategoriesController);
+
+router.get("/category/all", getAllNamePhotoCategoriesController);
 
 // [GET] /category/active - Ambil semua kategori yang aktif
 router.get("/category/active", getActiveCategoriesController);

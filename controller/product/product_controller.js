@@ -1,27 +1,29 @@
 const catchAsync = require('../../utils/catchAsync');
 const { StatusCodes } = require('http-status-codes');
 const {
-  getProductById,
-  getProductsByCategory,
-  createProduct,
-  deleteProduct,
-  getAllProducts,
-  searchProducts,
-  updateProduct
+  createProductService,
+  getProductByIdService,
+  getProductsByCategoryService,
+  getProductsByOutletIdService,
+  deleteProductService,
+  updateProductService,
+  searchProductsService,
+  getAllProductsService,
 } = require('../../service/product/product');
+const { formatImageToBase64 } = require('../../utils/func');
 
 // CREATE PRODUCT
 const createProductController = catchAsync(async (req, res) => {
-  const { name, description, pricePerKg, estimation, category, outletId } = req.body;
+  const { name, price, unit, category, outletId, description } = req.body;
+  const image = req.files?.image;
 
-  const newProduct = await createProduct({
-    name,
-    description,
-    pricePerKg,
-    estimation,
-    category,
-    outletId
-  });
+  let formattedImage = null;
+  if (image) {
+    formattedImage = formatImageToBase64(image);
+  }
+
+
+  const newProduct = await createProductService(name, category, Number(price), unit, outletId, formattedImage, description);
 
   res.status(StatusCodes.CREATED).json({
     status: true,
@@ -33,7 +35,7 @@ const createProductController = catchAsync(async (req, res) => {
 // GET PRODUCT BY ID
 const getProductByIdController = catchAsync(async (req, res) => {
   const { id } = req.params;
-  const product = await getProductById(id);
+  const product = await getProductByIdService(id);
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Product found',
@@ -44,7 +46,7 @@ const getProductByIdController = catchAsync(async (req, res) => {
 // GET PRODUCTS BY CATEGORY
 const getProductsByCategoryController = catchAsync(async (req, res) => {
   const { categoryId } = req.params;
-  const products = await getProductsByCategory(categoryId);
+  const products = await getProductsByCategoryService(categoryId);
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Products by category retrieved successfully',
@@ -52,20 +54,35 @@ const getProductsByCategoryController = catchAsync(async (req, res) => {
   });
 });
 
-// GET ALL PRODUCTS
+// GET ALL PRODUCTS WITH PAGINATION
 const getAllProductsController = catchAsync(async (req, res) => {
-  const products = await getAllProducts();
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 12;
+
+  const data = await getAllProductsService(page, limit);
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'All products retrieved successfully',
-    data: products
+    data: data,
+  });
+});
+
+// GET PRODUCTS BY OUTLET ID WITH PAGINATION
+const getProductsByOutletIdController = catchAsync(async (req, res) => {
+  const { outletId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+  const data = await getProductsByOutletIdService(outletId, page, limit);
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Products by outlet retrieved successfully',
+    data: data
   });
 });
 
 // SEARCH PRODUCTS
 const searchProductsController = catchAsync(async (req, res) => {
   const { query } = req.query;
-  const products = await searchProducts(query);
+  const products = await searchProductsService(query);
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Products found matching search criteria',
@@ -76,7 +93,7 @@ const searchProductsController = catchAsync(async (req, res) => {
 // DELETE PRODUCT
 const deleteProductController = catchAsync(async (req, res) => {
   const { id } = req.params;
-  await deleteProduct(id);
+  await deleteProductService(id);
   res.status(StatusCodes.NO_CONTENT).json({
     status: true,
     message: 'Product successfully deleted',
@@ -87,15 +104,17 @@ const deleteProductController = catchAsync(async (req, res) => {
 // UPDATE PRODUCT
 const updateProductController = catchAsync(async (req, res) => {
   const { id } = req.params;
-  const { name, description, pricePerKg, estimation, category, outletId } = req.body;
+  const { name, description, price, unit, category } = req.body;
+  const image = req.files?.image;
 
-  const updatedProduct = await updateProduct(id, {
+  const updatedProduct = await updateProductService(id, {
     name,
     description,
-    pricePerKg,
-    estimation,
+    price: price !== undefined ? Number(price) : undefined,
+    unit,
+
     category,
-    outletId
+    image
   });
 
   res.status(StatusCodes.OK).json({
@@ -112,5 +131,6 @@ module.exports = {
   getAllProductsController,
   searchProductsController,
   deleteProductController,
-  updateProductController
+  updateProductController,
+  getProductsByOutletIdController
 };

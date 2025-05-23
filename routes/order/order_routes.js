@@ -1,39 +1,34 @@
 const express = require("express");
 const router = express.Router();
 
-const { 
-    getOrderByIdController,
-    getOrdersByDateRangeController,
-    getOrdersByUserController,
-    cancelOrderController,
-    createOrderController,
-    getAllOrdersController,
-    updateOrderStatusController,
-    applyDiscountToOrderController
+const {
+  createOrderByCashierController,
+  createOrderByUserController,
+  getOrderByIdController,
+  getAllOrdersByOutletController,
+  getAllOrdersController,
+  cancelOrderController,
+
 } = require("../../controller/order/order_controller");
 
-// [POST] /order - Buat order baru
-router.post("/order", createOrderController);
+// [POST] /orders - Buat order baru
+router.post("/orders/cashiers", createOrderByCashierController);
+router.post("/orders/customers", createOrderByUserController);
 
-// [GET] /order - Get all orders (dengan optional query filter, misal: ?userId=... atau dateRange)
-router.get("/order", getAllOrdersController);
+// [GET] /orders - Ambil semua order (untuk admin)
+router.get("/orders", getAllOrdersController);
 
-// [GET] /order/:id - Get order by ID
-router.get("/order/:id", getOrderByIdController);
+// [GET] /orders/outlet/:outletId - Ambil semua order berdasarkan outlet
+router.get("/orders/outlet/:outletId", getAllOrdersByOutletController);
 
-// [GET] /order/date-range - Filter order by tanggal
-router.get("/order/date-range", getOrdersByDateRangeController);
+// [GET] /orders/:id - Ambil detail order berdasarkan ID
+router.get("/orders/:id", getOrderByIdController);
 
-// [GET] /order/by-user - Filter order by userId
-router.get("/order/by-user", getOrdersByUserController);
 
-// [PATCH] /order/:id/cancel - Batalkan order
-router.patch("/order/:id/cancel", cancelOrderController);
 
-// [PATCH] /order/:id/status - Update status order
-router.patch("/order/:id/status", updateOrderStatusController);
 
-// [PATCH] /order/:id/apply-discount - Tambahkan diskon ke order
-router.patch("/order/:id/apply-discount", applyDiscountToOrderController);
+
+// [DELETE] /orders/:id - Batalkan order
+router.delete("/orders/:id", cancelOrderController);
 
 module.exports = router;

@@ -1,60 +1,47 @@
 const catchAsync = require('../../utils/catchAsync');
 const { StatusCodes } = require('http-status-codes');
 const {
-  getOutletById,
-  getOutletByName,
-  getOutletsByLocation,
-  createOutlet,
-  deleteOutlet,
-  getAllOutlets,
-  updateOutlet
+  getAllOutletsServices,
+  getOutletByNameService,
+  getOutletsByLocationServices,
+  updateOutletService,
+  deleteOutletService,
+  createOutletService,
+  getAllListOutlesServices
 } = require('../../service/outlet/outlet_service');
+const { formatImageToBase64 } = require('../../utils/func');
 
-// CREATE OUTLET
 const createOutletController = catchAsync(async (req, res) => {
-  console.log(req.body);  // Periksa data yang diterima
+  const { name, address, lat, long, openingTime, closingTime, contactNumber, openingDays } = req.body;
+  const image = req.files?.image;
 
-  const { name, address, openingTime, closingTime, contactNumber } = req.body;
+  let formattedImage = null;
+  if (image) {
+    formattedImage = formatImageToBase64(image);
+  }
 
-  const newOutlet = await createOutlet({ name, address, openingTime, closingTime, contactNumber });
+  const newOutlet = await createOutletService({
+    name,
+    address,
+    lat,
+    long,
+    openingDays,
+    openingTime,
+    closingTime,
+    contactNumber,
+    image: formattedImage,
+  });
 
   res.status(StatusCodes.CREATED).json({
     status: true,
     message: 'Outlet successfully created',
-    data: newOutlet
+    data: newOutlet,
   });
 });
 
-// GET OUTLET BY ID
-const getOutletByIdController = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const outlet = await getOutletById(id);
-  if (!outlet) {
-    return res.status(StatusCodes.NOT_FOUND).json({
-      status: false,
-      message: 'Outlet not found',
-      data: null
-    });
-  }
-
-  res.status(StatusCodes.OK).json({
-    status: true,
-    message: 'Outlet retrieved successfully',
-    data: outlet
-  });
-});
-
-// GET OUTLET BY NAME
 const getOutletByNameController = catchAsync(async (req, res) => {
   const { name } = req.params;
-  const outlet = await getOutletByName(name);
-  if (!outlet) {
-    return res.status(StatusCodes.NOT_FOUND).json({
-      status: false,
-      message: 'Outlet not found',
-      data: null
-    });
-  }
+  const outlet = await getOutletByNameService(name);
 
   res.status(StatusCodes.OK).json({
     status: true,
@@ -63,10 +50,9 @@ const getOutletByNameController = catchAsync(async (req, res) => {
   });
 });
 
-// GET OUTLETS BY LOCATION
 const getOutletsByLocationController = catchAsync(async (req, res) => {
   const { location } = req.query;
-  const outlets = await getOutletsByLocation(location);
+  const outlets = await getOutletsByLocationServices(location);
   if (outlets.length === 0) {
     return res.status(StatusCodes.NOT_FOUND).json({
       status: false,
@@ -82,9 +68,9 @@ const getOutletsByLocationController = catchAsync(async (req, res) => {
   });
 });
 
-// GET ALL OUTLETS
 const getAllOutletsController = catchAsync(async (req, res) => {
-  const outlets = await getAllOutlets();
+  const { page = 1, limit = 10 } = req.query;
+  const outlets = await getAllOutletsServices(page, limit);
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'All outlets retrieved successfully',
@@ -92,45 +78,73 @@ const getAllOutletsController = catchAsync(async (req, res) => {
   });
 });
 
-// DELETE OUTLET
 const deleteOutletController = catchAsync(async (req, res) => {
   const { id } = req.params;
-  await deleteOutlet(id);
-  res.status(StatusCodes.NO_CONTENT).json({
-    status: true,
-    message: 'Outlet successfully deleted',
-    data: null
-  });
+  await deleteOutletService(id);
+  res.status(StatusCodes.NO_CONTENT).send();  // 204 No Content, no body
 });
 
-// UPDATE OUTLET
 const updateOutletController = catchAsync(async (req, res) => {
   const { id } = req.params;
-  const { name, location, contactNumber, openingHours } = req.body;
+  const { name, address, lat, long, openingTime, closingTime, contactNumber, openingDays } = req.body;
+  const image = req.files?.image;
 
-  const updatedOutlet = await updateOutlet(id, { name, location, contactNumber, openingHours });
+  let formattedImage = null;
+  if (image) {
+    formattedImage = formatImageToBase64(image);
+  }
+
+  const updateData = {
+    name,
+    location: { address, lat, long },
+    openingDays,
+    openingTime,
+    closingTime,
+    phone: contactNumber,
+    image: formattedImage,
+  };
+
+  const updatedOutlet = await updateOutletService(id, updateData);
 
   if (!updatedOutlet) {
     return res.status(StatusCodes.NOT_FOUND).json({
       status: false,
       message: 'Outlet not found',
-      data: null
+      data: null,
     });
   }
 
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Outlet successfully updated',
-    data: updatedOutlet
+    data: updatedOutlet,
+  });
+});
+
+const getAllListOutletController = catchAsync(async (req, res) => {
+  const data = await getAllListOutlesServices();
+
+  if (data.length === 0) {
+    return res.status(StatusCodes.OK).json({
+      status: true,
+      message: 'No outlets found.',
+      data: []
+    });
+  }
+
+  return res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Outlets fetched successfully.',
+    data: data
   });
 });
 
 module.exports = {
   createOutletController,
-  getOutletByIdController,
   getOutletByNameController,
   getOutletsByLocationController,
   getAllOutletsController,
   deleteOutletController,
-  updateOutletController
+  updateOutletController,
+  getAllListOutletController
 };

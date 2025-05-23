@@ -15,8 +15,14 @@ const discountSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Product'
   }],
+  outlet: {
+    type: Schema.Types.ObjectId,
+    ref: 'Outlet',
+    required: true
+  },
   maxUsage: { type: Number, default: null },
   usageCount: { type: Number, default: 0 }
 }, { timestamps: true });
+
 
 module.exports = mongoose.model('Discount', discountSchema);
