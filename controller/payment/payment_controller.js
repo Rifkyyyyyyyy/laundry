@@ -22,7 +22,7 @@ const createPaymentController = catchAsync(async (req, res) => {
 
 // Controller untuk update status order dari Midtrans (misalnya notifikasi webhook)
 const updateStatusFromMidtransController = catchAsync(async (req, res) => {
-  console.log(`body : ${req.body}`);
+
   const result = await updateStatusBasedOnMidtransServer(req.body);
 
   res.status(StatusCodes.OK).json({
