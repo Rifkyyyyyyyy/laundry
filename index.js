@@ -12,7 +12,7 @@ const { logInfo, logSuccess, logError } = require('./utils/err');
 const cors = require('cors');
 
 app.use(cors({
-  origin: 'http://localhost:3000', 
+  origin: 'http://localhost:3000',
 }));
 
 
@@ -36,8 +36,10 @@ const outletRoutes = require('./routes/outlet/outlet_routes');
 const categoryRoutes = require('./routes/category/category_routes');
 const authRoutes = require('./routes/auth/auth_routes');
 const userRoutes = require('./routes/user/user_routes');
+const operationalRoutes = require('./routes/operational/operational_routes')
 const management = require('./routes/management/management_routes')
-const tracking = require('./routes/tracking/tracking_routes')
+const tracking = require('./routes/tracking/tracking_routes');
+const stock = require('./routes/stock/stock_routes')
 
 
 // Register all routes with /api/ prefix
@@ -50,8 +52,10 @@ app.use('/api', outletRoutes);
 app.use('/api', categoryRoutes);
 app.use('/api', authRoutes);
 app.use('/api', userRoutes);
+app.use('/api' ,operationalRoutes)
 app.use('/api', management)
-app.use('/api', tracking)
+app.use('/api', tracking);
+app.use('/api', stock)
 
 
 //

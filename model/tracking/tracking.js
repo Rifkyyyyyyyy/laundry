@@ -11,7 +11,15 @@ const trackingSchema = new mongoose.Schema({
         {
             status: {
                 type: String,
-                enum: ['Order Created', 'In Progress', 'Completed', 'Taken'],
+                enum: [
+                    'Order Created',
+                    'Order Pending',
+                    'Payment Received',    
+                    'In Progress',
+                    'Completed',
+                    'Taken',
+                    'Order Canceled'
+                ],
                 required: true
             },
             timestamp: {
@@ -21,7 +29,5 @@ const trackingSchema = new mongoose.Schema({
         }
     ]
 });
-
-
 
 module.exports = mongoose.model('Tracking', trackingSchema);

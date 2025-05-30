@@ -52,7 +52,6 @@ const orderSchema = new Schema({
 
 }, { timestamps: true, versionKey: false });
 
-// TTL index: Hapus otomatis setelah waktu di 'expireAt' terlewati
-orderSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });
+
 
 module.exports = mongoose.model('Order', orderSchema);

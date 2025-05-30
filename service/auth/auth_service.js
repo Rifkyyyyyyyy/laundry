@@ -9,12 +9,12 @@ const {
 } = require('../cloudinary/cloudinary');
 
 const registerUserService = async ({
-  email, username, password, role, outletId, image
+  email, username, password, role, phone, outletId, image, address, lat, long
 }) => {
   try {
-    if (role === 'owner') {
-      throw new ApiError(StatusCodes.FORBIDDEN, 'Owner cannot register through this API. Please add directly in the database.');
-    }
+    // if (role === 'owner') {
+    //   throw new ApiError(StatusCodes.FORBIDDEN, 'Owner cannot register through this API. Please add directly in the database.');
+    // }
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Email or username already in use');
@@ -36,8 +36,14 @@ const registerUserService = async ({
       username,
       password: hashedPassword,
       role,
+      phone,
       outletId: role === 'kasir' ? outletId : undefined,
-      photo: fileId
+      photo: fileId,
+      address: {
+        address: address ?? null,
+        lat: lat ?? null,
+        long: long ?? null
+      }
     });
 
     await newUser.save();
@@ -48,6 +54,7 @@ const registerUserService = async ({
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message);
   }
 };
+
 
 const loginUserService = async (email, password) => {
   try {

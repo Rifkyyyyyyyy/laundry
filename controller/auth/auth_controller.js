@@ -5,7 +5,7 @@ const { formatImageToBase64 } = require('../../utils/func');
 
 // Register user (Kasir or Customer)
 const registerController = catchAsync(async (req, res) => {
-  const { email, username, password, role, outletId } = req.body;
+  const { email, username, password, role, phone, outletId, address, lat, long } = req.body;
   const image = req.files?.image;
 
   let formattedImage = null;
@@ -20,9 +20,8 @@ const registerController = catchAsync(async (req, res) => {
     });
   }
 
-  // Register a new user (Kasir or Customer)
   const newUser = await registerUserService({
-    email, username, password, role, outletId, image: formattedImage
+    email, username, password, role, phone, outletId, address, lat, long, image: formattedImage
   });
 
   res.status(StatusCodes.CREATED).json({
@@ -31,6 +30,7 @@ const registerController = catchAsync(async (req, res) => {
     data: newUser
   });
 });
+
 
 // Login user (Owner, Kasir, or Customer)
 const loginController = catchAsync(async (req, res) => {

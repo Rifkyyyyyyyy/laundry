@@ -9,7 +9,8 @@ const {
   getAllProductsController,
   searchProductsController,
   updateProductController,
-  getProductsByOutletIdController
+  getProductsByOutletIdController ,
+  getAllProductByOutletController
 } = require('../../controller/product/product_controller');
 
 // [POST] /product - Tambah produk baru
@@ -17,6 +18,9 @@ router.post("/product", createProductController);
 
 // [GET] /product - Ambil semua produk dengan pagination
 router.get("/product", getAllProductsController);
+
+router.get("/product/all/:outletId", getAllProductByOutletController);
+
 
 // [GET] /product/search - Cari produk berdasarkan keyword
 router.get("/product/search", searchProductsController);

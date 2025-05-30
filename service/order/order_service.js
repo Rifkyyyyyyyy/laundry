@@ -196,6 +196,7 @@ const createOrderByCashierService = async ({
   memberCode,
 }) => {
   try {
+
     if (!items || items.length === 0) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Order harus memiliki item');
     }
@@ -227,7 +228,7 @@ const createOrderByCashierService = async ({
       .slice(0, 12);
 
     const itemsWithSubtotal = await Promise.all(items.map(async (item) => {
-      const product = await Product.findById(item.productId);
+      const product = await Product.findById(item.id);
       if (!product) throw new ApiError(StatusCodes.NOT_FOUND, 'Produk tidak ditemukan');
 
       const unitPrice = product.price;
@@ -235,7 +236,7 @@ const createOrderByCashierService = async ({
       const subtotal = item.quantity * unitPrice;
 
       return {
-        productId: item.productId,
+        productId: item.id,
         quantity: item.quantity,
         pricePerKg: unit === 'kg' ? unitPrice : undefined,
         pricePerItem: unit === 'item' ? unitPrice : undefined,
@@ -341,8 +342,67 @@ const createOrderByCashierService = async ({
     return savedOrder;
 
   } catch (error) {
+    console.log(`err : ${error}`);
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message || 'Terjadi kesalahan saat membuat order');
   }
+};
+
+
+const calculateTotal = async (items, serviceType = 'regular', memberCode = null) => {
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new Error('Order harus memiliki minimal satu item');
+  }
+
+  // Ambil semua produk berdasarkan ID di items
+  const productIds = items.map(item => item.id);
+  const products = await Product.find({ _id: { $in: productIds } });
+
+  // Gabungkan data items dengan data produk (price & unit)
+  const itemsWithPrice = items.map(item => {
+    const product = products.find(p => p._id.toString() === item.id);
+    if (!product) {
+      throw new Error(`Produk dengan ID ${item.id} tidak ditemukan`);
+    }
+
+    return {
+      quantity: item.quantity,
+      price: product.price,
+      unit: product.unit
+    };
+  });
+
+  // Hitung subtotal
+  const subtotal = itemsWithPrice.reduce((acc, item) => {
+    const quantity = Number(item.quantity) || 0;
+    const price = Number(item.price) || 0;
+    return acc + (quantity * price);
+  }, 0);
+
+  // Tambah service fee
+  let serviceFee = 0;
+  if (serviceType === 'express') serviceFee = 5000;
+  else if (serviceType === 'super_express') serviceFee = 10000;
+
+  let total = subtotal + serviceFee;
+
+  // Inisialisasi diskon
+  let discountPercent = 0;
+
+  if (memberCode) {
+    const member = await Member.findOne({ memberNumber: memberCode });
+    if (member) {
+      switch (member.membershipLevel) {
+        case 'silver': discountPercent = 0.05; break;
+        case 'gold': discountPercent = 0.10; break;
+        case 'platinum': discountPercent = 0.15; break;
+      }
+    }
+  }
+
+  // Hitung total akhir setelah diskon
+  total -= total * discountPercent;
+
+  return total;
 };
 
 
@@ -584,6 +644,7 @@ const searchOrderByCustomerNameAndOutletService = async (searchTerm, outletId, p
 module.exports = {
   createOrderByCashierService,
   createOrderByUserService,
+  calculateTotal ,
   getAllOrdersByOutletService,
   getAllOrdersService,
   getOrderByIdService,

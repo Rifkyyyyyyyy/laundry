@@ -8,50 +8,64 @@ const {
 
 const {
   getPagination,
-  calculateExpiredDate
 } = require('../../utils/func')
 
 const crypto = require('crypto');
 
 
 const createMemberService = async (userId, outletId, membershipLevel, membershipDuration) => {
-  // Validasi membershipDuration, hanya boleh 1, 3, 6, atau 12
-  const validDurations = [1, 3, 6, 12];
-  if (!validDurations.includes(membershipDuration)) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Durasi keanggotaan tidak valid. Pilih antara 1, 3, 6, atau 12 bulan.');
+  try {
+    console.log(`durasi : ${membershipDuration}`);
+    // Validasi membershipDuration, hanya boleh 1, 3, 6, atau 12
+    const validDurations = [1, 3, 6, 12];
+    if (!validDurations.includes(membershipDuration)) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Durasi keanggotaan tidak valid. Pilih antara 1, 3, 6, atau 12 bulan.');
+    }
+
+    // Cek apakah user sudah menjadi member
+    const existingMember = await Member.findOne({ userId });
+    if (existingMember) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, 'User sudah terdaftar sebagai member.');
+    }
+
+    // Generate member number unik (12 karakter hex uppercase)
+    const memberNumber = 'MBR-' + crypto.randomBytes(6).toString('hex').toUpperCase();
+
+    // Set tanggal bergabung dan tanggal kedaluwarsa
+    const joinDate = new Date();
+    const expiredDate = new Date(joinDate);
+    expiredDate.setMonth(expiredDate.getMonth() + membershipDuration);
+
+    // Membuat anggota baru
+    const newMember = new Member({
+      userId,
+      outletId,
+      membershipLevel,
+      joinDate,
+      expiredDate,
+      points: 0,
+      memberNumber
+    });
+
+    // Simpan member dan populate data terkait
+    await newMember.save();
+    return await newMember
+      .populate('outletId', 'name')
+      .populate({
+        path: 'userId',
+        select: 'username email photo',
+        populate: { path: 'photo', select: 'url' }
+      });
+  } catch (error) {
+    console.log(`error : ${error}`);
+    // Tangani error tidak terduga
+    throw new ApiError(
+      error.statusCode || STATUS_CODES.INTERNAL_SERVER_ERROR,
+      error.message || 'Terjadi kesalahan saat membuat member.'
+    );
   }
-
-  // Cek apakah user sudah menjadi member
-  const existingMember = await Member.findOne({ userId });
-  if (existingMember) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, 'User sudah terdaftar sebagai member');
-  }
-
-  // Generate member number unik
-  const memberNumber = 'MBR-' + crypto.randomBytes(6).toString('hex').toUpperCase(); // 12-karakter hex
-
-  // Set tanggal bergabung (joinDate)
-  const joinDate = new Date();
-
-  // Menghitung expiredDate berdasarkan membershipDuration (dalam bulan)
-  const expiredDate = new Date(joinDate);
-  expiredDate.setMonth(expiredDate.getMonth() + membershipDuration); // Menambahkan membershipDuration ke bulan expiredDate
-
-  // Membuat anggota baru
-  const newMember = new Member({
-    userId,
-    outletId,
-    membershipLevel,
-    joinDate,
-    expiredDate, // Tanggal kadaluwarsa dihitung di sini
-    points: 0,
-    memberNumber
-  });
-
-  // Simpan member baru ke database
-  await newMember.save();
-  return newMember;
 };
+
 
 
 
@@ -90,21 +104,34 @@ const getAllMembersService = async (page = 1, limit = 5) => {
 };
 
 
-// GET MEMBER BY ID
-const getMemberByIdService = async (id) => {
-  const member = await Member.findById(id);
-  if (!member) throw new ApiError(STATUS_CODES.NOT_FOUND, 'Member tidak ditemukan');
-  return member;
-};
 
 // UPDATE MEMBER BY ID
 const updateMemberService = async (id, data) => {
-  const updatedMember = await Member.findByIdAndUpdate(id, data, { new: true, runValidators: true });
-  if (!updatedMember) {
-    throw new ApiError(STATUS_CODES.NOT_FOUND, 'Member tidak ditemukan untuk diperbarui');
+  try {
+    const updatedMember = await Member.findByIdAndUpdate(id, data, {
+      new: true,
+      runValidators: true
+    })
+    .populate('outletId', 'name')
+    .populate({
+      path: 'userId',
+      select: 'username email photo',
+      populate: { path: 'photo', select: 'url' }
+    });
+
+    if (!updatedMember) {
+      throw new ApiError(STATUS_CODES.NOT_FOUND, 'Member tidak ditemukan untuk diperbarui.');
+    }
+
+    return updatedMember;
+  } catch (error) {
+    throw new ApiError(
+      error.statusCode || STATUS_CODES.INTERNAL_SERVER_ERROR,
+      error.message || 'Terjadi kesalahan saat memperbarui member.'
+    );
   }
-  return updatedMember;
 };
+
 
 // DELETE MEMBER BY ID
 const deleteMemberService = async (id) => {
@@ -113,30 +140,6 @@ const deleteMemberService = async (id) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, 'Member tidak ditemukan');
   }
   return deletedMember;
-};
-
-// GET ACTIVE MEMBERS
-const getActiveMembersService = async () => {
-  return await Member.find({ isActive: true });
-};
-
-// GET MEMBER BY USER ID
-const getMemberByUserIdService = async (userId) => {
-  const member = await Member.findOne({ userId });
-  if (!member) throw new ApiError(STATUS_CODES.NOT_FOUND, 'Member tidak ditemukan');
-  return member;
-};
-
-// VALIDATE MEMBER STATUS
-const validateMemberStatusService = async (id) => {
-  const member = await Member.findById(id);
-  if (!member) throw new ApiError(STATUS_CODES.NOT_FOUND, 'Member tidak ditemukan');
-
-  if (!member.isActive) {
-    throw new ApiError(STATUS_CODES.FORBIDDEN, 'Member tidak aktif');
-  }
-
-  return member;
 };
 
 // GET MEMBERS BY OUTLET ID
@@ -411,12 +414,8 @@ const filterMemberByPointsService = async (outletId, sort = 'desc', page = 1, li
 module.exports = {
   createMemberService,
   getAllMembersService,
-  getMemberByIdService,
   updateMemberService,
   deleteMemberService,
-  getActiveMembersService,
-  getMemberByUserIdService,
-  validateMemberStatusService,
   getMembersByOutletIdService,
   searchMemberService,
   filterMemberByJoinDateService,

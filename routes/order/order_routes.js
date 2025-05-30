@@ -8,11 +8,13 @@ const {
   getAllOrdersByOutletController,
   getAllOrdersController,
   cancelOrderController,
+  calculateTotalController
 
 } = require("../../controller/order/order_controller");
 
 // [POST] /orders - Buat order baru
 router.post("/orders/cashiers", createOrderByCashierController);
+router.post("/orders/total",  calculateTotalController);
 router.post("/orders/customers", createOrderByUserController);
 
 // [GET] /orders - Ambil semua order (untuk admin)

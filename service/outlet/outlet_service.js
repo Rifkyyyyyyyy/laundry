@@ -6,20 +6,17 @@ const { handleImageDestroys, handleImageUpload } = require('../cloudinary/cloudi
 
 const createOutletService = async ({ name, address, lat, long, openingTime, closingTime, contactNumber, image, openingDays }) => {
   try {
-    console.log('Data yang masuk:', {
-      name,
-      address,
-      lat,
-      long,
-      openingTime,
-      closingTime,
-      contactNumber,
-      image,
-      openingDays,
-    });
+
+    // Parsing openingDays jika berupa string (karena dikirim dari FormData)
+    let parsedOpeningDays;
+    try {
+      parsedOpeningDays = typeof openingDays === 'string' ? JSON.parse(openingDays) : openingDays;
+    } catch (e) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Format openingDays tidak valid');
+    }
 
     // Validasi wajib isi semua
-    if (!name || !address || !lat || !long || !openingTime || !closingTime || !openingDays || !Array.isArray(openingDays) || openingDays.length === 0) {
+    if (!name || !address || !lat || !long || !openingTime || !closingTime || !parsedOpeningDays || !Array.isArray(parsedOpeningDays) || parsedOpeningDays.length === 0) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Semua field wajib diisi dengan benar');
     }
 
@@ -47,7 +44,7 @@ const createOutletService = async ({ name, address, lat, long, openingTime, clos
         long: longNum,
       },
       phone: contactNumber || '',
-      openingDays,
+      openingDays: parsedOpeningDays,
       openingTime,
       closingTime,
       photo: photoId
@@ -55,9 +52,11 @@ const createOutletService = async ({ name, address, lat, long, openingTime, clos
 
     return newOutlet;
   } catch (error) {
+    console.log(`error : ${error}`);
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error?.message || 'Gagal membuat outlet');
   }
 };
+
 
 
 

@@ -4,6 +4,7 @@ const {
   createOrderByCashierService,
   createOrderByUserService,
   getAllOrdersByOutletService,
+  calculateTotal,
   getAllOrdersService,
   getOrderByIdService,
   cancelOrderServices,
@@ -41,6 +42,9 @@ const createOrderByUserController = catchAsync(async (req, res) => {
 });
 
 
+
+
+
 const createOrderByCashierController = catchAsync(async (req, res) => {
   const {
     processedBy,
@@ -56,17 +60,19 @@ const createOrderByCashierController = catchAsync(async (req, res) => {
     memberCode,
   } = req.body;
 
+  console.log(`data : ${JSON.stringify(req.body)}`);
+
   const order = await createOrderByCashierService({
-    processedBy ,
-    customerName ,
-    customerPhone ,
-    customerEmail ,
-    outletId ,
-    items ,
-    pickupDate ,
-    note ,
-    paymentType ,
-    serviceType ,
+    processedBy,
+    customerName,
+    customerPhone,
+    customerEmail,
+    outletId,
+    items,
+    pickupDate,
+    note,
+    paymentType,
+    serviceType,
     memberCode
   })
 
@@ -76,6 +82,30 @@ const createOrderByCashierController = catchAsync(async (req, res) => {
     data: order,
   });
 });
+
+
+const calculateTotalController = catchAsync(async (req, res) => {
+  const { items, serviceType = 'regular', memberLevel = null } = req.body;
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      status: false,
+      message: 'Order harus memiliki minimal satu item',
+    });
+  }
+
+  // Hitung total dengan fungsi calculateTotal
+  const total = await calculateTotal(items, serviceType, memberLevel);
+
+  console.log(total);
+
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Total berhasil dihitung',
+    data: total
+  });
+});
+
 
 
 
@@ -133,8 +163,9 @@ const cancelOrderController = catchAsync(async (req, res) => {
 });
 
 module.exports = {
-  createOrderByUserController ,
-  createOrderByCashierController ,
+  createOrderByUserController,
+  createOrderByCashierController,
+  calculateTotalController ,
   getOrderByIdController,
   getAllOrdersByOutletController,
   getAllOrdersController,

@@ -7,7 +7,8 @@ const {
   updateOutletService,
   deleteOutletService,
   createOutletService,
-  getAllListOutlesServices
+  getAllListOutlesServices ,
+
 } = require('../../service/outlet/outlet_service');
 const { formatImageToBase64 } = require('../../utils/func');
 

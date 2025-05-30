@@ -24,8 +24,6 @@ const createProductService = async (name, category, price, unit, outletId, image
       throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Nama produk sudah digunakan');
     }
 
-
-
     const photoId = await handleImageUpload('products', image);
 
     const newProduct = await Product.create({
@@ -38,12 +36,17 @@ const createProductService = async (name, category, price, unit, outletId, image
       photo: photoId,
     });
 
-    return newProduct;
+    // Ambil ulang produk yang baru dibuat dengan populate
+    const populatedProduct = await Product.findById(newProduct._id)
+      .populate('category')
+      .populate('outletId')
+      .populate('photo');
+
+    return populatedProduct;
   } catch (error) {
     throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error?.message || 'Gagal membuat produk');
   }
 };
-
 
 
 const updateProductService = async (productId, { name, price, unit, category, image, description }) => {
@@ -208,6 +211,36 @@ const getProductsByOutletIdService = async (outletId, page = 1, limit = 10) => {
   }
 };
 
+const getSimpleProductsByOutletIdService = async (outletId) => {
+  try {
+    const products = await Product.find({ outletId })
+      .select('name price productId photo') // ambil hanya field yang dibutuhkan
+      .populate({
+        path: 'photo',
+        select: 'url' // ambil hanya URL dari relasi photo
+      });
+
+    if (products.length === 0) {
+      throw new ApiError(STATUS_CODES.NOT_FOUND, 'Produk tidak ditemukan untuk outlet ini');
+    }
+
+    const mappedProducts = products.map(product => ({
+      _id: product._id,
+      name: product.name,
+      price : product.price,
+      url: product.photo ? product.photo.url : null,
+    }));
+
+    return mappedProducts;
+  } catch (error) {
+    throw new ApiError(
+      STATUS_CODES.INTERNAL_SERVER_ERROR,
+      error?.message || 'Gagal mengambil produk berdasarkan outlet'
+    );
+  }
+};
+
+
 module.exports = {
   createProductService,
   updateProductService,
@@ -217,4 +250,5 @@ module.exports = {
   getProductsByCategoryService,
   searchProductsService,
   getProductsByOutletIdService,
+  getSimpleProductsByOutletIdService
 };
