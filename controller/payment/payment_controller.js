@@ -1,8 +1,8 @@
-const { 
-  createPaymentServices, 
-  updateStatusBasedOnMidtransServer, 
-  getAllPaymentBasedOnOutletId, 
-  getAllPayments 
+const {
+  createPaymentServices,
+  updateStatusBasedOnMidtransServer,
+  getAllPaymentBasedOnOutletId,
+  getAllPayments
 } = require('../../service/payment/payment_services');
 const catchAsync = require('../../utils/catchAsync');
 const { StatusCodes } = require('http-status-codes');
@@ -39,12 +39,15 @@ const updateStatusFromMidtransController = catchAsync(async (req, res) => {
 // Controller untuk ambil semua payment berdasarkan outletId
 const getPaymentsByOutletController = catchAsync(async (req, res) => {
   const { outletId } = req.params;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 5;
+
 
   if (!outletId) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'outletId harus disertakan');
   }
 
-  const payments = await getAllPaymentBasedOnOutletId(outletId);
+  const payments = await getAllPaymentBasedOnOutletId({ page, limit, outletId });
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -55,7 +58,15 @@ const getPaymentsByOutletController = catchAsync(async (req, res) => {
 
 // Controller untuk ambil semua payment tanpa filter
 const getAllPaymentsController = catchAsync(async (req, res) => {
-  const payments = await getAllPayments();
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+
+  const payments = await getAllPayments({
+    page ,
+    limit
+  });
+
 
   res.status(StatusCodes.OK).json({
     success: true,
