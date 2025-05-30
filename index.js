@@ -68,6 +68,7 @@ mongoose.connect(`${process.env.CLOUD_URI}`, {
   serverSelectionTimeoutMS: 15000,
   connectTimeoutMS: 15000,
   socketTimeoutMS: 45000,
+  tls : true,
   maxPoolSize: 20,
   minPoolSize: 5,
 }).then(() => logSuccess('✅ MongoDB connected successfully'))

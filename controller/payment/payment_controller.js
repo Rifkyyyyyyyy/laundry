@@ -1,4 +1,9 @@
-const { createPaymentServices, updateStatusBasedOnMidtransServer } = require('../../service/payment/payment_services');
+const { 
+  createPaymentServices, 
+  updateStatusBasedOnMidtransServer, 
+  getAllPaymentBasedOnOutletId, 
+  getAllPayments 
+} = require('../../service/payment/payment_services');
 const catchAsync = require('../../utils/catchAsync');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../../utils/apiError');
@@ -22,7 +27,6 @@ const createPaymentController = catchAsync(async (req, res) => {
 
 // Controller untuk update status order dari Midtrans (misalnya notifikasi webhook)
 const updateStatusFromMidtransController = catchAsync(async (req, res) => {
-
   const result = await updateStatusBasedOnMidtransServer(req.body);
 
   res.status(StatusCodes.OK).json({
@@ -32,7 +36,37 @@ const updateStatusFromMidtransController = catchAsync(async (req, res) => {
   });
 });
 
+// Controller untuk ambil semua payment berdasarkan outletId
+const getPaymentsByOutletController = catchAsync(async (req, res) => {
+  const { outletId } = req.params;
+
+  if (!outletId) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'outletId harus disertakan');
+  }
+
+  const payments = await getAllPaymentBasedOnOutletId(outletId);
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: 'Daftar pembayaran berdasarkan outlet berhasil didapatkan',
+    data: payments,
+  });
+});
+
+// Controller untuk ambil semua payment tanpa filter
+const getAllPaymentsController = catchAsync(async (req, res) => {
+  const payments = await getAllPayments();
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: 'Daftar semua pembayaran berhasil didapatkan',
+    data: payments,
+  });
+});
+
 module.exports = {
   createPaymentController,
   updateStatusFromMidtransController,
+  getPaymentsByOutletController,
+  getAllPaymentsController,
 };
