@@ -44,6 +44,7 @@ const createProductService = async (name, category, price, unit, outletId, image
 
     return populatedProduct;
   } catch (error) {
+    console.log(`error : ${error}`);
     throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error?.message || 'Gagal membuat produk');
   }
 };
