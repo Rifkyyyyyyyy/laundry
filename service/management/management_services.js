@@ -116,6 +116,8 @@ const getTodayTrackingSummaryByOutletId = async (outletId) => {
   }
 };
 
+
+
 module.exports = {
   getTodayTrackingSummaryByOutletId
 };

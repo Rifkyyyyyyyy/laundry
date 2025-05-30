@@ -34,14 +34,8 @@ const getTrackingByOrderId = async (orderId) => {
     }
 };
 
-const updateTrackingByOutlet = async (outletId, status) => {
+const updateTrackingByOutlet = async (id, status) => {
     try {
-        if (!mongoose.Types.ObjectId.isValid(outletId)) {
-            throw new ApiError(
-                STATUS_CODES.BAD_REQUEST,
-                'ID outlet tidak valid.'
-            );
-        }
 
         if (!VALID_STATUSES.includes(status)) {
             throw new ApiError(

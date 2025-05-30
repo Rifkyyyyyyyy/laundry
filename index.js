@@ -12,9 +12,8 @@ const { logInfo, logSuccess, logError } = require('./utils/err');
 const cors = require('cors');
 
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'https://laundryfe.onrender.com'],
 }));
-
 
 app.use(express.json());
 app.use(fileUpload({
