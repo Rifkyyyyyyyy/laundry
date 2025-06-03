@@ -3,7 +3,7 @@ const { StatusCodes } = require('http-status-codes');
 const {
     getTrackingByOrderId,
     getTrackingByOutletId,
-    updateTrackingByOutlet
+    updateTrackingById
 } = require('../../service/tracking/tracking_service');
 
 // [GET] /tracking/order/:orderId
@@ -35,8 +35,10 @@ const getTrackingByOutlet = catchAsync(async (req, res) => {
 
 // [PATCH] /tracking/outlet/:outletId
 const updateTracking = catchAsync(async (req, res) => {
-    const { outletId } = req.params;
+    const { id } = req.params;  // id tracking
     const { status } = req.body;
+
+    console.log(`status : ${status} id : ${id}`);
 
     if (!status) {
         return res.status(StatusCodes.BAD_REQUEST).json({
@@ -45,15 +47,23 @@ const updateTracking = catchAsync(async (req, res) => {
         });
     }
 
-    const updatedCount = await updateTrackingByOutlet(outletId, status);
+    // updateTrackingById harus mengembalikan data baru (updated tracking)
+    const updatedTracking = await updateTrackingById(id, status);
+
+    if (!updatedTracking) {
+        return res.status(StatusCodes.NOT_FOUND).json({
+            status: false,
+            message: 'Tracking not found or not updated',
+        });
+    }
 
     res.status(StatusCodes.OK).json({
         status: true,
-        message: updatedCount > 0 
-            ? `${updatedCount} tracking(s) updated successfully`
-            : 'No tracking updated',
+        message: 'Tracking updated successfully',
+        data: updatedTracking  // ini data tracking terbaru yang sudah diupdate
     });
 });
+
 
 module.exports = {
     getTrackingByOrder,

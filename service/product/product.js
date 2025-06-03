@@ -242,6 +242,43 @@ const getSimpleProductsByOutletIdService = async (outletId) => {
 };
 
 
+const getSimpleProductsService = async () => {
+  try {
+    const products = await Product.find()
+      .select('name price outletId photo') // tambahkan outletId
+      .populate({
+        path: 'photo',
+        select: 'url'
+      })
+      .populate({
+        path: 'outletId',
+        select: 'name'
+      });
+
+    if (products.length === 0) {
+      throw new ApiError(STATUS_CODES.NOT_FOUND, 'Tidak ada produk ditemukan');
+    }
+
+    const mappedProducts = products.map(product => ({
+      id: product._id,
+      name: product.name,
+      price: product.price,
+      url: product.photo?.url || null,
+      outletName: product.outletId?.name || null ,
+    }));
+
+    return mappedProducts;
+  } catch (error) {
+    throw new ApiError(
+      STATUS_CODES.INTERNAL_SERVER_ERROR,
+      error?.message || 'Gagal mengambil produk'
+    );
+  }
+};
+
+
+
+
 module.exports = {
   createProductService,
   updateProductService,
@@ -251,5 +288,6 @@ module.exports = {
   getProductsByCategoryService,
   searchProductsService,
   getProductsByOutletIdService,
-  getSimpleProductsByOutletIdService
+  getSimpleProductsByOutletIdService ,
+  getSimpleProductsService
 };

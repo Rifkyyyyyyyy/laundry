@@ -22,19 +22,26 @@ const handleImageUpload = async (folderName, image) => {
 };
 
 
-const handleImageDestroys = async (fileId) => {
-    const file = await File.findById(fileId);
-    if (!file) return;
 
-    // Hapus dari Cloudinary jika public_id tersedia
-    if (file.public_id) {
-        await cloudinary.uploader.destroy(file.public_id);
+const handleImageDestroys = async (publicId) => {
+    try {
+      // Cari data file berdasarkan public_id
+      const file = await File.findOne({ public_id: publicId });
+      if (!file) {
+        console.warn(`File dengan public_id "${publicId}" tidak ditemukan`);
+        return;
+      }
+  
+      // Hapus file dari Cloudinary
+      await cloudinary.uploader.destroy(publicId);
+  
+      // Hapus file dari database
+      await File.findByIdAndDelete(file._id);
+    } catch (error) {
+      console.error(`handleImageDestroys error: ${error.message}`);
     }
-
-    // Hapus record dari database
-    await File.findByIdAndDelete(fileId);
-};
-
+  };
+  
 
 
 module.exports = {

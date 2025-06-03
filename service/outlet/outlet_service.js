@@ -159,14 +159,20 @@ const getOutletByNameService = async (name) => {
   }
 };
 
-const getAllListOutlesServices = async () => {
+const  getAllListOutlesServices = async () => {
   try {
-    const outlets = await Outlet.find({}, { _id: 1, name: 1 });
+    const outlets = await Outlet.find({}, { _id: 1, name: 1, photo: 1 })
+      .populate({
+        path: 'photo',
+        select: 'url -_id' // hanya ambil url saja, tanpa _id
+      });
+
     return outlets;
   } catch (error) {
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Gagal mengambil daftar outlet');
   }
 };
+
 
 module.exports = {
   createOutletService,

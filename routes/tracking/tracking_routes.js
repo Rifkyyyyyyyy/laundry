@@ -15,7 +15,7 @@ router.get('/tracking/:orderId', getTrackingByOrder);
 router.get('/tracking/outlet/:outletId', getTrackingByOutlet);
 
 // Route untuk update tracking (misal status order berubah)
-router.put('tracking/:trackingId', updateTracking);
+router.put('/tracking/:id', updateTracking);
 
 
 module.exports = router;    

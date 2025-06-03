@@ -12,7 +12,7 @@ const { logInfo, logSuccess, logError } = require('./utils/err');
 const cors = require('cors');
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://laundryfe.onrender.com'],
+  origin: ['http://localhost:3000', 'https://laundryfe.onrender.com' , 'http://127.0.0.1:5500'],
 }));
 
 app.use(express.json());

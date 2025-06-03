@@ -9,7 +9,7 @@ const Tracking = require('../../model/tracking/tracking');
 const { snapApi } = require('../../midtrans');
 const catchAsync = require('../../utils/catchAsync');
 const {
- getPagination
+  getPagination
 } = require('../../utils/func')
 
 
@@ -41,9 +41,6 @@ const createPaymentServices = async (orderId) => {
       };
     });
 
-    // Hitung gross_amount
-    let gross_amount = item_details.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
     // Tambahkan service fee jika ada
     let serviceFee = 0;
     if (order.serviceType === 'express') {
@@ -59,20 +56,29 @@ const createPaymentServices = async (orderId) => {
         price: serviceFee,
         quantity: 1,
       });
-      gross_amount += serviceFee;
     }
 
-    // Kurangi diskon jika ada
+    // Tambahkan diskon sebagai item dengan harga negatif
     if (order.discountAmount && order.discountAmount > 0) {
-      gross_amount -= order.discountAmount;
+      item_details.push({
+        id: 'discount',
+        name: `Diskon`,
+        price: -order.discountAmount,
+        quantity: 1,
+      });
     }
 
+    // Hitung gross_amount sesuai jumlah item_details (termasuk diskon & service fee)
+    const gross_amount = item_details.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    // Cek kesesuaian gross_amount dengan total order di database
     if (Math.abs(gross_amount - order.total) > 1) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         'Perhitungan gross_amount tidak sesuai dengan total'
       );
     }
+
 
     // Prepare payload Midtrans
     const payload = {
@@ -127,27 +133,27 @@ const updateStatusBasedOnMidtransServer = catchAsync(async (data) => {
       fraud_status, payment_type,
       transaction_id, settlement_time
     } = data;
-  
+
     const serverKey = process.env.MIDTRANS_SERVER_KEY.trim();
     const rawString = `${order_id}${status_code}${gross_amount}${serverKey}`;
     const computedHash = crypto.createHash('sha512').update(rawString).digest('hex');
-  
+
     if (signature_key !== computedHash) {
       throw new ApiError(StatusCodes.UNAUTHORIZED, 'Signature tidak valid', 'INVALID_SIGNATURE');
     }
-  
+
     const order = await Order.findOne({ orderCode: order_id });
     if (!order) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Order tidak ditemukan');
     }
-  
+
     let paymentStatus = 'pending';
     if (transaction_status === 'settlement' || (transaction_status === 'capture' && fraud_status === 'accept')) {
       paymentStatus = 'paid';
     } else if (transaction_status === 'expire' || transaction_status === 'cancel') {
       paymentStatus = transaction_status;
     }
-  
+
     let payment = await Payment.findOne({ orderId: order._id });
     if (!payment) {
       payment = new Payment({
@@ -166,13 +172,13 @@ const updateStatusBasedOnMidtransServer = catchAsync(async (data) => {
       payment.paidAt = settlement_time ? new Date(settlement_time) : new Date();
       payment.metadata = data;
     }
-  
+
     await payment.save();
-  
+
     if (paymentStatus === 'paid') {
       order.paymentStatus = 'paid';
       await order.save();
-  
+
       let tracking = await Tracking.findOne({ orderId: order._id });
       if (!tracking) {
         tracking = new Tracking({
@@ -184,10 +190,10 @@ const updateStatusBasedOnMidtransServer = catchAsync(async (data) => {
       } else {
         tracking.logs.push({ status: 'Payment Received' });
       }
-  
+
       await tracking.save();
     }
-  
+
     return payment;
   } catch (error) {
     throw new ApiError(
@@ -282,7 +288,7 @@ const getAllPaymentBasedOnOutletId = async ({ page = 1, limit = 5, outletId }) =
             username: '$customer.username',
             email: '$customer.email',
             phone: '$customer.phone',
-            name: { 
+            name: {
               $cond: [
                 { $ifNull: ['$customer.username', false] },
                 '$customer.username',
@@ -428,7 +434,7 @@ const getAllPayments = async ({ page = 1, limit = 5 }) => {
             username: '$customer.username',
             email: '$customer.email',
             phone: '$customer.phone',
-            name: { 
+            name: {
               $cond: [
                 { $ifNull: ['$customer.username', false] },
                 '$customer.username',
@@ -482,7 +488,7 @@ const getAllPayments = async ({ page = 1, limit = 5 }) => {
 
 module.exports = {
   createPaymentServices,
-  updateStatusBasedOnMidtransServer ,
-  getAllPaymentBasedOnOutletId ,
+  updateStatusBasedOnMidtransServer,
+  getAllPaymentBasedOnOutletId,
   getAllPayments
 };

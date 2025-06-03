@@ -77,14 +77,12 @@ const createOrderByUserService = async ({
     let total = itemsWithSubtotal.reduce((acc, item) => acc + item.subtotal, 0);
 
     // Biaya layanan berdasarkan serviceType
-
     let serviceFee = 0;
     if (serviceType === 'express') {
       serviceFee = 5000;
     } else if (serviceType === 'super_express') {
       serviceFee = 10000;
     }
-
     total += serviceFee;
 
     // Cek diskon voucher
@@ -175,11 +173,27 @@ const createOrderByUserService = async ({
 
     const savedOrder = await newOrder.save();
 
+    // Tambah points member sesuai serviceType jika member valid
+    if (member) {
+      const pointsPerService = {
+        regular: 10,
+        express: 20,
+        super_express: 30,
+      };
+      const pointsToAdd = pointsPerService[serviceType] || 0;
+
+      await Member.findOneAndUpdate(
+        { userId: customerId, outletId },
+        { $inc: { points: pointsToAdd } }
+      );
+    }
+
     return savedOrder;
   } catch (error) {
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message || 'Terjadi kesalahan saat membuat order');
   }
 };
+
 
 
 const createOrderByCashierService = async ({
@@ -196,22 +210,27 @@ const createOrderByCashierService = async ({
   memberCode,
 }) => {
   try {
+    // Validasi items
     if (!items || items.length === 0) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Order harus memiliki item');
     }
 
+    // Validasi paymentType
     if (paymentType !== 'cash') {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Kasir hanya bisa membuat order dengan pembayaran cash');
     }
 
+    // Validasi customerName
     if (!customerName?.trim()) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Nama pelanggan wajib diisi');
     }
 
+    // Validasi processedBy
     if (!processedBy) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'User kasir (processedBy) wajib diisi');
     }
 
+    // Validasi pickupDate
     const today = new Date();
     const pickup = new Date(pickupDate);
     pickup.setHours(0, 0, 0, 0);
@@ -221,11 +240,13 @@ const createOrderByCashierService = async ({
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Tanggal pickup tidak valid');
     }
 
+    // Generate orderCode unik
     const orderCode = 'ORD-' + crypto.createHash('md5')
       .update(`${customerName}-${Date.now()}-${Math.random()}`)
       .digest('hex')
       .slice(0, 12);
 
+    // Proses items: cari produk dan hitung subtotal
     const itemsWithSubtotal = await Promise.all(items.map(async (item) => {
       const product = await Product.findById(item.id);
       if (!product) throw new ApiError(StatusCodes.NOT_FOUND, 'Produk tidak ditemukan');
@@ -243,19 +264,30 @@ const createOrderByCashierService = async ({
       };
     }));
 
+    // Hitung total
     let total = itemsWithSubtotal.reduce((acc, item) => acc + item.subtotal, 0);
 
+    // Tambah serviceFee sesuai serviceType
     let serviceFee = 0;
     if (serviceType === 'express') serviceFee = 5000;
     else if (serviceType === 'super_express') serviceFee = 10000;
 
     total += serviceFee;
 
+    // Inisialisasi discountAmount
     let discountAmount = 0;
+
+    // Jika ada memberCode, cek member dan hitung diskon
     if (memberCode) {
-      const member = await Member.findOne({ code: memberCode });
+      const member = await Member.findOne({ memberNumber: memberCode, outletId });
       if (!member) {
         throw new ApiError(StatusCodes.BAD_REQUEST, 'Kode member tidak valid');
+      }
+
+      // Cek expiredDate member
+      const now = new Date();
+      if (member.expiredDate < now) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Member sudah expired');
       }
 
       const discountMap = {
@@ -265,22 +297,21 @@ const createOrderByCashierService = async ({
       };
 
       const discountPercent = discountMap[member.membershipLevel] || 0;
-      const discount = total * discountPercent;
-
-      discountAmount = discount;
-      total -= discount;
+      discountAmount = total * discountPercent;
+      total -= discountAmount;
     }
 
+    // Estimasi selesai
     const estimationDaysMap = {
       regular: 3,
       express: 2,
       super_express: 1,
     };
-
     const estimationDays = estimationDaysMap[serviceType] || 3;
     const estimatedCompletionDate = new Date();
     estimatedCompletionDate.setDate(today.getDate() + estimationDays);
 
+    // Simpan order baru
     const newOrder = new Order({
       orderCode,
       customerId: null,
@@ -304,6 +335,7 @@ const createOrderByCashierService = async ({
 
     const savedOrder = await newOrder.save();
 
+    // Generate invoiceNumber dan simpan payment
     const invoiceNumber = 'INV-' + crypto.createHash('md5')
       .update(`${savedOrder._id}-${Date.now()}-${Math.random()}`)
       .digest('hex')
@@ -319,11 +351,28 @@ const createOrderByCashierService = async ({
       processedBy,
     }).save();
 
+    // Simpan tracking log
     await new Tracking({
       orderId: savedOrder._id,
       logs: [{ status: 'Order Created', timestamp: new Date() }],
     }).save();
 
+    // Update points member sesuai serviceType
+    if (memberCode) {
+      const pointsPerService = {
+        regular: 10,
+        express: 20,
+        super_express: 30,
+      };
+      const pointsToAdd = pointsPerService[serviceType] || 0;
+
+      await Member.findOneAndUpdate(
+        { memberNumber: memberCode, outletId },
+        { $inc: { points: pointsToAdd } }
+      );
+    }
+
+    // Return order lengkap dengan populate
     return await Order.findById(savedOrder._id)
       .populate('outletId')
       .populate('items.productId');
@@ -332,6 +381,7 @@ const createOrderByCashierService = async ({
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message || 'Terjadi kesalahan saat membuat order');
   }
 };
+
 
 
 const calculateTotal = async (items, serviceType = 'regular', memberCode = null) => {
@@ -403,34 +453,29 @@ const getOrderByIdService = async (id) => {
   }
 };
 
-// GET ALL BY OUTLET (sudah ada try-catch)
 const getAllOrdersByOutletService = async (page = 1, limit = 10, outletId) => {
   try {
     const { skip, limit: pageLimit, metadata } = getPagination({ page, limit });
-    const filter = { outletId };
+
+    const filter = { outletId }; // ambil semua, tanpa filter customerId
 
     const orders = await Order.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(pageLimit)
-      .populate({
-        path: 'customerId',
-        match: { $ne: null }  // populate hanya jika customerId tidak null
-      })
+      .populate('customerId') // populate tetap dijalankan, nanti dicek apakah null
       .populate('outletId')
       .populate('items.productId');
 
-
     const totalCount = await Order.countDocuments(filter);
 
-    // Map untuk mengganti customerName/Phone jika null
     const formattedOrders = orders.map(order => {
       const customer = order.customerId;
 
       return {
         ...order.toObject(),
-        customerName: order.customerName || customer?.username || null,
-        customerPhone: order.customerPhone || customer?.phone || null,
+        customerName: customer ? customer.username : order.customerName,
+        customerPhone: customer ? customer.phone : order.customerPhone,
       };
     });
 
@@ -453,24 +498,33 @@ const getAllOrdersByOutletService = async (page = 1, limit = 10, outletId) => {
 
 
 
+
 const getAllOrdersService = async (page = 1, limit = 10) => {
   try {
     const { skip, limit: pageLimit, metadata } = getPagination({ page, limit });
 
-    const orders = await Order.find()
+    const orders = await Order.find({})
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(pageLimit)
-      .populate({
-        path: 'customerId',
-        match: { $ne: null }  // populate hanya jika customerId tidak null
-      })
+      .populate('customerId')
       .populate('outletId')
       .populate('items.productId');
-    const totalCount = await Order.countDocuments();
+
+    const totalCount = await Order.countDocuments({});
+
+    const formattedOrders = orders.map(order => {
+      const customer = order.customerId;
+
+      return {
+        ...order.toObject(),
+        customerName: customer?.username ?? order.customerName,
+        customerPhone: customer?.phone ?? order.customerPhone,
+      };
+    });
 
     return {
-      orders,
+      orders: formattedOrders,
       pagination: {
         ...metadata,
         totalCount,

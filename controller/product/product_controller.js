@@ -9,7 +9,8 @@ const {
   updateProductService,
   searchProductsService,
   getAllProductsService,
-  getSimpleProductsByOutletIdService
+  getSimpleProductsByOutletIdService ,
+  getSimpleProductsService
 } = require('../../service/product/product');
 const { formatImageToBase64 } = require('../../utils/func');
 
@@ -54,6 +55,16 @@ const getAllProductByOutletController = catchAsync(async (req, res) => {
     data: product
   });
 });
+
+const getAllProductController = catchAsync(async (req, res) => {
+  const product = await getSimpleProductsService();
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Product found',
+    data: product
+  });
+});
+
 
 // GET PRODUCTS BY CATEGORY
 const getProductsByCategoryController = catchAsync(async (req, res) => {
@@ -145,5 +156,6 @@ module.exports = {
   deleteProductController,
   updateProductController,
   getProductsByOutletIdController ,
-  getAllProductByOutletController
+  getAllProductByOutletController ,
+  getAllProductController
 };

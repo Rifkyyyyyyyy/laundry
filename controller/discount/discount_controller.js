@@ -2,16 +2,16 @@ const catchAsync = require('../../utils/catchAsync');
 const { StatusCodes } = require('http-status-codes');
 const {
   createDiscountForOutletService,
-  deleteDiscountForOutletService,
-  updateDiscountForOutletService,
+  deleteDiscount,
+  updateDiscount,
   getAllDiscountService,
   getDiscountsForOutletService
 } = require('../../service/discount/discount_service');
 
 // 1. Create Discount
 const createDiscountByOutletController = catchAsync(async (req, res) => {
-  const {
-    outletId,
+  console.log(`body : ${JSON.stringify(req.body)}`);
+  const { 
     code,
     discountAmount,
     validFrom,
@@ -20,14 +20,23 @@ const createDiscountByOutletController = catchAsync(async (req, res) => {
     maxUsage
   } = req.body;
 
+  const discountAmountNum = Number(discountAmount);
+  if (isNaN(discountAmountNum)) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      status: false,
+      message: 'discountAmount harus berupa angka yang valid'
+    });
+  }
+
+  // Pastikan outletId diteruskan ke service, karena di service createDiscountForOutletService
+  // kamu perlu outletIds untuk simpan di discount
   const newDiscount = await createDiscountForOutletService(
     code,
-    discountAmount,
+    discountAmountNum,
     validFrom,
     validUntil,
     applicableProductIds,
-    outletId,
-    maxUsage
+    maxUsage,
   );
 
   res.status(StatusCodes.CREATED).json({
@@ -66,9 +75,10 @@ const getDiscountsByOutletController = catchAsync(async (req, res) => {
 // 4. Update Discount
 const updateDiscountController = catchAsync(async (req, res) => {
   const { discountId } = req.params;
-  const { outletId, ...updateData } = req.body;
+  const updateData = req.body;
 
-  const updatedDiscount = await updateDiscountForOutletService(discountId, outletId, updateData);
+  // Perhatikan service updateDiscount hanya menerima discountId dan updateData
+  const updatedDiscount = await updateDiscount(discountId, updateData);
 
   res.status(StatusCodes.OK).json({
     status: true,
@@ -80,9 +90,8 @@ const updateDiscountController = catchAsync(async (req, res) => {
 // 5. Delete Discount
 const deleteDiscountController = catchAsync(async (req, res) => {
   const { discountId } = req.params;
-  const { outletId } = req.body;
 
-  await deleteDiscountForOutletService(discountId, outletId);
+  await deleteDiscount(discountId);
 
   res.status(StatusCodes.OK).json({
     status: true,

@@ -1,20 +1,22 @@
 const ApiError = require('../../utils/apiError');
-const { STATUS_CODES } = require('http');
+const { StatusCodes } = require('http-status-codes');
 const Discount = require('../../model/discounts/discount');
+const Product = require('../../model/product/product'); // tambahkan ini
 const { getPagination } = require('../../utils/func');
 
+// CREATE DISCOUNT
 const createDiscountForOutletService = async (
   code,
   discountAmount,
   validFrom,
   validUntil,
   applicableProductIds,
-  outletId,
   maxUsage
 ) => {
   const now = new Date();
 
-  // Validasi: discountAmount harus antara 1 dan 100 (persen)
+  console.log(`code : ${code} - amount : ${discountAmount} - valid : ${validFrom} until : ${validUntil} - produk : ${applicableProductIds} - usage : ${maxUsage}`);
+
   if (
     typeof discountAmount !== 'number' ||
     discountAmount < 1 ||
@@ -29,7 +31,6 @@ const createDiscountForOutletService = async (
   const start = new Date(validFrom);
   const end = new Date(validUntil);
 
-  // Validasi: Tanggal mulai dan akhir tidak boleh sama
   if (start.getTime() === end.getTime()) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
@@ -37,7 +38,6 @@ const createDiscountForOutletService = async (
     );
   }
 
-  // Validasi: Tanggal mulai dan akhir tidak boleh di masa lalu
   if (start < now || end < now) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
@@ -45,7 +45,6 @@ const createDiscountForOutletService = async (
     );
   }
 
-  // Cek apakah kode diskon sudah ada
   const existingDiscount = await Discount.findOne({ code });
   if (existingDiscount) {
     throw new ApiError(
@@ -54,13 +53,33 @@ const createDiscountForOutletService = async (
     );
   }
 
+  if (!applicableProductIds || applicableProductIds.length === 0) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Setidaknya satu produk harus dipilih.'
+    );
+  }
+
+  const products = await Product.find({
+    _id: { $in: applicableProductIds }
+  }).select('outletId');
+
+  if (products.length !== applicableProductIds.length) {
+    throw new ApiError(
+      StatusCodes.NOT_FOUND,
+      'Beberapa produk tidak ditemukan.'
+    );
+  }
+
+  const outletIds = [...new Set(products.map(p => String(p.outletId)))];
+
   const data = {
     code,
     discountAmount,
     validFrom: start,
     validUntil: end,
     applicableProductIds,
-    outlet: outletId,
+    outletIds,
     maxUsage,
     usageCount: 0,
     status: 'active',
@@ -69,8 +88,20 @@ const createDiscountForOutletService = async (
   try {
     const discount = new Discount(data);
     await discount.save();
-    return discount;
+
+    const populatedDiscount = await Discount.findById(discount._id)
+      .populate({
+        path: 'applicableProductIds',
+        populate: {
+          path: 'category photo outletId',
+          select: 'name url',
+        },
+      })
+      .populate('outletIds', 'name address');
+
+    return populatedDiscount;
   } catch (error) {
+    console.log(`error : ${error}`);
     throw new ApiError(
       StatusCodes.INTERNAL_SERVER_ERROR,
       'Terjadi kesalahan saat menyimpan diskon: ' + error.message
@@ -78,54 +109,62 @@ const createDiscountForOutletService = async (
   }
 };
 
-
-
 // DELETE DISCOUNT
-const deleteDiscountForOutletService = async (discountId, outletId) => {
+const deleteDiscountForOutletService = async (discountId) => {
   try {
-    const discount = await Discount.findOneAndDelete({ _id: discountId, outlet: outletId });
+    const discount = await Discount.findByIdAndDelete(discountId);
     if (!discount) {
-      throw new ApiError(STATUS_CODES.NOT_FOUND, 'Discount not found for this outlet');
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Diskon tidak ditemukan');
     }
     return discount;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error.message);
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message);
   }
 };
 
 // UPDATE DISCOUNT
-const updateDiscountForOutletService = async (discountId, outletId, updateData) => {
+const updateDiscountForOutletService = async (discountId, updateData) => {
   try {
-    const discount = await Discount.findOneAndUpdate(
-      { _id: discountId, outlet: outletId },
+    const discount = await Discount.findByIdAndUpdate(
+      discountId,
       updateData,
       { new: true }
-    );
+    )
+      .populate('applicableProductIds')
+      .populate('outletIds');
 
     if (!discount) {
-      throw new ApiError(STATUS_CODES.NOT_FOUND, 'Discount not found for this outlet');
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Diskon tidak ditemukan');
     }
 
     return discount;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error.message);
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message);
   }
 };
 
-// GET ALL DISCOUNTS FOR AN OUTLET (with pagination)
+// GET DISCOUNTS BY OUTLET
 const getDiscountsForOutletService = async (outletId, page = 1, limit = 5) => {
   try {
     const { skip, limit: pageLimit } = getPagination({ page, limit });
 
-    const discounts = await Discount.find({ outlet: outletId })
+    const discounts = await Discount.find({ outletIds: outletId })
       .skip(skip)
       .limit(pageLimit)
-      .populate('applicableProductIds', 'name pricePerKg') // Populate nama & harga produk
+      .populate({
+        path: 'applicableProductIds',
+        select: 'name price unit category photo',
+        populate: [
+          { path: 'category', select: 'name' },
+          { path: 'photo', select: 'url' },
+        ],
+      })
+      .populate('outletIds', 'name')
       .sort({ createdAt: -1 });
 
-    const total = await Discount.countDocuments({ outlet: outletId });
+    const total = await Discount.countDocuments({ outletIds: outletId });
 
     return {
       discounts,
@@ -137,11 +176,11 @@ const getDiscountsForOutletService = async (outletId, page = 1, limit = 5) => {
       },
     };
   } catch (error) {
-    throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error.message);
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message);
   }
 };
 
-// GET ALL DISCOUNTS (global) (with pagination)
+// GET ALL DISCOUNTS
 const getAllDiscountService = async (page = 1, limit = 5) => {
   try {
     const { skip, limit: pageLimit } = getPagination({ page, limit });
@@ -149,8 +188,8 @@ const getAllDiscountService = async (page = 1, limit = 5) => {
     const discounts = await Discount.find()
       .skip(skip)
       .limit(pageLimit)
-      .populate('outlet', 'name address') // Populate nama dan alamat outlet
-      .populate('applicableProductIds', 'name pricePerKg') // Populate nama dan harga produk
+      .populate('outletIds', 'name address')
+      .populate('applicableProductIds', 'name pricePerKg')
       .sort({ createdAt: -1 });
 
     const total = await Discount.countDocuments();
@@ -165,7 +204,7 @@ const getAllDiscountService = async (page = 1, limit = 5) => {
       },
     };
   } catch (error) {
-    throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, error.message);
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message);
   }
 };
 

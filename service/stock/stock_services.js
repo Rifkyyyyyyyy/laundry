@@ -82,6 +82,7 @@ const getAllInventoryForOutletId = async (outletId, page = 1, limit = 5) => {
       },
     };
   } catch (error) {
+    console.log(`error : ${error}`);
     throw error;
   }
 };
@@ -116,6 +117,8 @@ const getAllStockForAllOutlet = async (page = 1, limit = 5) => {
 
 const updateStockService = async (itemId, jumlah) => {
   try {
+    console.log(`id : ${itemId} jumlah : ${jumlah}`);
+
     if (typeof jumlah !== 'number' || isNaN(jumlah)) {
       throw new ApiError(400, 'Jumlah harus berupa angka valid');
     }
@@ -125,20 +128,23 @@ const updateStockService = async (itemId, jumlah) => {
       throw new ApiError(404, 'Item tidak ditemukan');
     }
 
-    item.stock += jumlah;
-
-    if (item.stock < 0) {
-      item.stock = 0;
-    }
+    // Ganti stok lama dengan jumlah baru langsung
+    item.stock = jumlah < 0 ? 0 : jumlah;
 
     await item.save();
 
-    return await item.populate('outletId', 'name address')
-      .populate('createdBy', 'username email');
+    const updatedItem = await item.populate([
+      { path: 'outletId', select: 'name address' },
+      { path: 'createdBy', select: 'username email' }
+    ]);
+
+    return updatedItem;
   } catch (error) {
+    console.log(`error : ${error}`);
     throw error;
   }
 };
+
 
 module.exports = {
   addInventoryService,

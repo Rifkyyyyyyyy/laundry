@@ -81,13 +81,16 @@ const deleteUserService = async (userId) => {
       throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
     }
 
+    console.log(`user : ${JSON.stringify(user)}`)
+
     if (user.photo) {
       await handleImageDestroys(user.photo.public_id);
-      await File.findByIdAndDelete(user.photo._id);
+  
     }
 
     await user.deleteOne();
   } catch (error) {
+    console.log(`error : ${error}`)
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message);
   }
 };
@@ -99,12 +102,18 @@ const getCashierService = async (page = 1, limit = 5) => {
 
   try {
     const cashiers = await User.find({ role: 'kasir' })
-      .skip(skip)
-      .limit(pageLimit)
-      .populate('outletId')
-      .populate('photo')
-      .select('-password');
-
+    .skip(skip)
+    .limit(pageLimit)
+    .populate({
+      path: 'outletId',
+      populate: {
+        path: 'photo', // ini akan populate Outlet.photo
+        model: 'File'  // pastikan ini cocok dengan schema Outlet
+      }
+    })
+    .populate('photo') // ini untuk User.photo (jika ada)
+    .select('-password');
+  
     const totalCount = await User.countDocuments({ role: 'kasir' });
 
     return {
