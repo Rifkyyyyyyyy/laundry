@@ -11,6 +11,7 @@ const {
   filterMemberByTierService,
   getMembersByOutletIdService,
   searchMemberService,
+  searchAllMemberService
 } = require('../../service/member/member_service');
 
 // CREATE MEMBER
@@ -50,16 +51,13 @@ const deleteMemberController = catchAsync(async (req, res) => {
 // UPDATE MEMBER
 const updateMemberController = catchAsync(async (req, res) => {
   const { id } = req.params;
-  const { userId, outletId, membershipLevel, name, phoneNumber, status } = req.body;
+  const { membershipLevel, membershipDuration } = req.body;
 
-  const updatedMember = await updateMemberService(id, {
-    userId,
-    outletId,
-    membershipLevel,
-    name,
-    phoneNumber,
-    status
-  });
+
+  const updatedMember = await updateMemberService(id, 
+    membershipLevel ,
+    membershipDuration
+  );
 
   if (!updatedMember) {
     return res.status(StatusCodes.NOT_FOUND).json({
@@ -164,6 +162,20 @@ const filterMemberByTierController = catchAsync(async (req, res) => {
   });
 });
 
+const searchAllMembersController = catchAsync(async (req, res) => {
+  const { searchTerm = '', page = 1, limit = 5 } = req.query;
+
+
+
+
+  const result = await searchAllMemberService(searchTerm, parseInt(page), parseInt(limit));
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Pencarian member berhasil.',
+    data: result
+  });
+});
+
 module.exports = {
   createMemberController,
   getAllMembersController,
@@ -173,5 +185,6 @@ module.exports = {
   searchAllMembersByOutletController,
   filterMemberByJoinDateController,
   filterMemberByPointsController,
-  filterMemberByTierController
+  filterMemberByTierController,
+  searchAllMembersController
 };

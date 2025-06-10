@@ -11,6 +11,7 @@ const {
     filterMemberByPointsController,
     filterMemberByTierController,
     searchAllMembersByOutletController,
+    searchAllMembersController
 } = require('../../controller/member/member_controler');
 
 // [POST] /member - Tambah member baru
@@ -22,6 +23,8 @@ router.get("/member", getAllMembersController);
 // [GET] /member/search/:outletId - Cari member berdasarkan outletId
 router.get("/member/search/:outletId", searchAllMembersByOutletController);
 
+
+router.get("/members/search/", searchAllMembersController);
 
 // [PATCH] /member/:id - Update member berdasarkan ID
 router.patch("/member/:id", updateMemberController);

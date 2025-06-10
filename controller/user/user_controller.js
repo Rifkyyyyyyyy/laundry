@@ -52,24 +52,49 @@ const searchAllCustomerController = catchAsync(async (req, res) => {
 
 // Controller untuk update user
 const updateUserController = catchAsync(async (req, res) => {
-  const userId = req.params.id;
+  const id = req.params.id;
 
   // Mengambil data update dari request body
-  const { email, username, password, address, lat, long } = req.body;
-  const image = req.files?.image;
+  const {
+    email,
+    username,
+    password,
+    address,
+    lat,
+    long,
+    phone,
+    outletId,
+  } = req.body;
+
+  // Ambil file image dari req.files (biasanya array atau objek)
+  const imageFile = req.files?.image;
+
   let formattedImage = null;
-  if (image) {
-    formattedImage = formatImageToBase64(image);
+  if (imageFile) {
+   
+    formattedImage = formatImageToBase64(imageFile);
   }
 
-  const updatedUser = await updateUserService(userId, email, username, password, formattedImage, address, lat, long);
+  const updatedUser = await updateUserService(
+    id,
+    email,
+    username,
+    password,
+    formattedImage,
+    address,
+    lat,
+    long,
+    phone,
+    outletId
+  );
 
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'User updated successfully',
-    data: updatedUser
+    data: updatedUser,
   });
 });
+
 
 // Controller untuk delete user
 const deleteUserController = catchAsync(async (req, res) => {

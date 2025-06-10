@@ -10,8 +10,31 @@ const {
 } = require('../cloudinary/cloudinary');
 
 
-const updateUserService = async (userId, email, username, password, image, address, lat, long) => {
+const updateUserService = async (
+  userId,
+  email,
+  username,
+  password,
+  image,
+  address,
+  lat,
+  long,
+  phone,
+  outletId
+) => {
   try {
+    console.log('Input updateUserService:');
+    console.log(`userId: ${userId}`);
+    console.log(`email: ${email}`);
+    console.log(`username: ${username}`);
+    console.log(`password: ${password ? '[REDACTED]' : ''}`); // jangan log password asli
+    console.log(`image: ${image ? '[FILE OR URL]' : 'null'}`);
+    console.log(`address: ${address}`);
+    console.log(`lat: ${lat}`);
+    console.log(`long: ${long}`);
+    console.log(`phone: ${phone}`);
+    console.log(`outletId: ${outletId}`);
+
     const user = await User.findById(userId).populate('photo');
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
@@ -35,11 +58,9 @@ const updateUserService = async (userId, email, username, password, image, addre
       user.username = username;
     }
 
-    // 🔒 Cegah update role & outletId
-    if ('role' in user || 'outletId' in user) {
-      if (user.role !== user._doc.role || String(user.outletId) !== String(user._doc.outletId)) {
-        throw new ApiError(StatusCodes.FORBIDDEN, 'Role and OutletId cannot be updated');
-      }
+    // Jangan izinkan update role
+    if ('role' in user && user.role !== user._doc.role) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Role cannot be updated');
     }
 
     // Update password jika ada
@@ -49,7 +70,7 @@ const updateUserService = async (userId, email, username, password, image, addre
 
     // Update foto jika ada
     if (image) {
-      if (user.photo) {
+      if (user.photo && user.photo.public_id) {
         await handleImageDestroys(user.photo.public_id);
       }
       const fileId = await handleImageUpload('users', image);
@@ -57,17 +78,28 @@ const updateUserService = async (userId, email, username, password, image, addre
     }
 
     // Update address, lat, long jika ada
-    if (address || lat || long) {
+    if (address || lat !== undefined || long !== undefined) {
       user.address = {
-        address: address || user.address?.address || '',
+        address: address ?? user.address?.address ?? '',
         lat: lat !== undefined ? lat : user.address?.lat,
-        lng: long !== undefined ? long : user.address?.lng
+        long: long !== undefined ? long : user.address?.long,
       };
+    }
+
+    // Update phone jika ada
+    if (phone) {
+      user.phone = phone;
+    }
+
+    // Update outletId jika ada (boleh diubah)
+    if (outletId && String(outletId) !== String(user.outletId)) {
+      user.outletId = outletId;
     }
 
     await user.save();
     return user;
   } catch (error) {
+    console.log(`error : ${error}`);
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message);
   }
 };
@@ -85,7 +117,7 @@ const deleteUserService = async (userId) => {
 
     if (user.photo) {
       await handleImageDestroys(user.photo.public_id);
-  
+
     }
 
     await user.deleteOne();
@@ -102,18 +134,18 @@ const getCashierService = async (page = 1, limit = 5) => {
 
   try {
     const cashiers = await User.find({ role: 'kasir' })
-    .skip(skip)
-    .limit(pageLimit)
-    .populate({
-      path: 'outletId',
-      populate: {
-        path: 'photo', // ini akan populate Outlet.photo
-        model: 'File'  // pastikan ini cocok dengan schema Outlet
-      }
-    })
-    .populate('photo') // ini untuk User.photo (jika ada)
-    .select('-password');
-  
+      .skip(skip)
+      .limit(pageLimit)
+      .populate({
+        path: 'outletId',
+        populate: {
+          path: 'photo', // ini akan populate Outlet.photo
+          model: 'File'  // pastikan ini cocok dengan schema Outlet
+        }
+      })
+      .populate('photo') // ini untuk User.photo (jika ada)
+      .select('-password');
+
     const totalCount = await User.countDocuments({ role: 'kasir' });
 
     return {

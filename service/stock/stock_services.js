@@ -146,9 +146,33 @@ const updateStockService = async (itemId, jumlah) => {
 };
 
 
+
+const deleteStockById = async (id) => {
+  try {
+    if (!id) {
+      throw new ApiError(400, 'ID item wajib diberikan');
+    }
+
+    const deletedItem = await InventoryItem.findByIdAndDelete(id)
+      .populate('outletId', 'name address')
+      .populate('createdBy', 'username email');
+
+    if (!deletedItem) {
+      throw new ApiError(404, 'Item tidak ditemukan');
+    }
+
+    return deletedItem;
+  } catch (error) {
+    throw new ApiError(error.statusCode || 500, error.message || 'Terjadi kesalahan saat menghapus item');
+  }
+};
+
+
+
 module.exports = {
   addInventoryService,
   getAllInventoryForOutletId,
   getAllStockForAllOutlet,
   updateStockService,
+  deleteStockById
 };

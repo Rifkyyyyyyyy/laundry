@@ -5,6 +5,7 @@ const {
   addInventoryService,
   updateStockService,
   getAllStockForAllOutlet,
+  deleteStockById
 } = require('../../service/stock/stock_services');
 
 
@@ -80,9 +81,23 @@ const updateStock = catchAsync(async (req, res) => {
 });
 
 
+const deleteStock = catchAsync(async (req, res) => {
+  const { id } = req.params;
+
+  const deletedItem = await deleteStockById(id);
+
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Item berhasil dihapus dari inventaris',
+    data: deletedItem,
+  });
+});
+
+
 module.exports = {
   addInventory,
   getInventoryByOutlet,
   getAllInventory,
   updateStock,
+  deleteStock
 };

@@ -105,32 +105,60 @@ const getAllMembersService = async (page = 1, limit = 5) => {
 
 
 
-// UPDATE MEMBER BY ID
-const updateMemberService = async (id, data) => {
+const updateMemberService = async (id, membershipLevel, membershipDuration) => {
   try {
-    const updatedMember = await Member.findByIdAndUpdate(id, data, {
+    const validDurations = [1, 3, 6, 12];
+    const updateData = {};
+
+    if (membershipLevel !== undefined) {
+      updateData.membershipLevel = membershipLevel;
+    }
+
+    if (membershipDuration !== undefined) {
+      if (!validDurations.includes(membershipDuration)) {
+        throw new ApiError(
+          STATUS_CODES.BAD_REQUEST,
+          'Durasi keanggotaan tidak valid. Pilih antara 1, 3, 6, atau 12 bulan.'
+        );
+      }
+
+      const now = new Date();
+      const newExpiredDate = new Date(now);
+      newExpiredDate.setMonth(newExpiredDate.getMonth() + membershipDuration);
+
+      updateData.expiredDate = newExpiredDate;
+      updateData.joinedDate = now; // ← set joinedDate ke sekarang juga
+    }
+
+    const updatedMember = await Member.findByIdAndUpdate(id, updateData, {
       new: true,
-      runValidators: true
+      runValidators: true,
     })
-    .populate('outletId', 'name')
-    .populate({
-      path: 'userId',
-      select: 'username email photo',
-      populate: { path: 'photo', select: 'url' }
-    });
+      .populate('outletId', 'name')
+      .populate({
+        path: 'userId',
+        select: 'username email photo',
+        populate: { path: 'photo', select: 'url' },
+      });
 
     if (!updatedMember) {
-      throw new ApiError(STATUS_CODES.NOT_FOUND, 'Member tidak ditemukan untuk diperbarui.');
+      throw new ApiError(
+        STATUS_CODES.NOT_FOUND,
+        'Member tidak ditemukan untuk diperbarui.'
+      );
     }
 
     return updatedMember;
   } catch (error) {
+    console.log(`error : ${error}`);
     throw new ApiError(
       error.statusCode || STATUS_CODES.INTERNAL_SERVER_ERROR,
       error.message || 'Terjadi kesalahan saat memperbarui member.'
     );
   }
 };
+
+
 
 
 // DELETE MEMBER BY ID
@@ -285,6 +313,139 @@ const searchMemberService = async (searchTerm, outletId, page = 1, limit = 5) =>
 };
 
 
+const searchAllMemberService = async (searchTerm, page = 1, limit = 5) => {
+  const { skip, limit: pageLimit, metadata } = getPagination({ page, limit });
+
+  try {
+    console.log(`data : ${searchTerm} - PAGE : ${page} - limit : ${limit}`);
+
+    const aggregation = [
+      // Lookup user data
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+
+      // Pastikan user.photo valid ObjectId, jika tidak set null agar $lookup tidak error
+      {
+        $addFields: {
+          'user.photo': {
+            $cond: {
+              if: {
+                $and: [
+                  { $ne: ['$user.photo', null] },
+                  { $ne: ['$user.photo', ''] },
+                  { $regexMatch: { input: { $toString: '$user.photo' }, regex: /^[a-fA-F0-9]{24}$/ } }
+                ]
+              },
+              then: '$user.photo',
+              else: null
+            }
+          }
+        }
+      },
+
+      // Lookup file photo jika ada
+      {
+        $lookup: {
+          from: 'files',
+          localField: 'user.photo',
+          foreignField: '_id',
+          as: 'user.photo'
+        }
+      },
+      {
+        $unwind: {
+          path: '$user.photo',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      // Filter sesuai search term di username atau email
+      {
+        $match: {
+          $or: [
+            { 'user.username': { $regex: searchTerm, $options: 'i' } },
+            { 'user.email': { $regex: searchTerm, $options: 'i' } }
+          ]
+        }
+      },
+
+      // Lookup outlet
+      {
+        $lookup: {
+          from: 'outlets',
+          localField: 'outletId',
+          foreignField: '_id',
+          as: 'outlet'
+        }
+      },
+      {
+        $unwind: {
+          path: '$outlet',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      // Facet untuk pagination dan data
+      {
+        $facet: {
+          metadata: [{ $count: 'total' }],
+          data: [
+            { $skip: skip },
+            { $limit: pageLimit },
+            {
+              $project: {
+                _id: 1,
+                membershipLevel: 1,
+                joinDate: 1,
+                expiredDate: 1,
+                points: 1,
+                memberNumber: 1,
+                outletId: {
+                  _id: '$outlet._id',
+                  name: '$outlet.name'
+                },
+                userId: {
+                  _id: '$user._id',
+                  username: '$user.username',
+                  email: '$user.email',
+                  photo: {
+                    _id: '$user.photo._id',
+                    url: '$user.photo.url'
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ];
+
+    const result = await Member.aggregate(aggregation);
+    const members = result[0]?.data || [];
+    const totalCount = result[0]?.metadata[0]?.total || 0;
+
+    return {
+      members,
+      pagination: {
+        ...metadata,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageLimit)
+      }
+    };
+  } catch (error) {
+    console.log(`error: ${error}`);
+
+    throw new ApiError(STATUS_CODES.INTERNAL_SERVER_ERROR, 'Gagal melakukan pencarian member');
+  }
+};
+
 
 const filterMemberByTierService = async (outletId, page = 1, limit = 5) => {
   const { skip, limit: pageLimit, metadata } = getPagination({ page, limit });
@@ -420,5 +581,6 @@ module.exports = {
   searchMemberService,
   filterMemberByJoinDateService,
   filterMemberByPointsService,
-  filterMemberByTierService
+  filterMemberByTierService ,
+  searchAllMemberService
 };

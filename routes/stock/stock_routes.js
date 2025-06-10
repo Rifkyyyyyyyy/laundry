@@ -5,7 +5,8 @@ const {
   getAllInventory,
   addInventory,
   getInventoryByOutlet,
-  updateStock
+  updateStock ,
+  deleteStock
 } = require('../../controller/stock/stock_controller');
 
 // Route: Ambil semua stok dari semua outlet (admin/owner)
@@ -19,5 +20,7 @@ router.get("/stock/outlet/:outletId", getInventoryByOutlet);
 
 // Route: Update stok item berdasarkan itemId
 router.patch("/stock/:itemId", updateStock);
+
+router.delete('/stock/:id' , deleteStock)
 
 module.exports = router;
